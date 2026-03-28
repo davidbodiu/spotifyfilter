@@ -295,10 +295,13 @@ searchInput.addEventListener('keydown', (e) => {
 // Init
 async function init() {
   try {
-    const res = await fetch('data.json');
-    allSongs = await res.json();
+    const res = await fetch('data.json.gz');
+    const ds = new DecompressionStream('gzip');
+    const decompressed = res.body.pipeThrough(ds);
+    const text = await new Response(decompressed).text();
+    allSongs = JSON.parse(text);
   } catch (e) {
-    resultsCount.textContent = 'Failed to load data.json';
+    resultsCount.textContent = 'Failed to load data';
     return;
   }
 

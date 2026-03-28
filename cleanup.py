@@ -7,12 +7,14 @@ Post-scrape cleanup for data.json:
 """
 
 import json
+import gzip
 import re
 import unicodedata
 
 INPUT_FILE = "data.json"
-OUTPUT_FILE = "data.json"
+OUTPUT_FILE = "data.json.gz"
 STREAM_TOLERANCE = 0.02  # 2% tolerance for matching stream counts
+MIN_TOTAL_STREAMS = 1_000_000  # exclude songs below this threshold
 
 
 def fix_encoding(text):
@@ -183,6 +185,9 @@ def cleanup(songs):
         else:
             song["popularity"] = 0
 
+    # Step 4: Filter by minimum stream threshold
+    deduped = [s for s in deduped if s["totalStreams"] >= MIN_TOTAL_STREAMS]
+
     # Sort by total streams descending
     deduped.sort(key=lambda s: s["totalStreams"], reverse=True)
     return deduped
@@ -202,9 +207,10 @@ def main():
     encoding_fixes = sum(1 for s in cleaned if "ñ" in s["title"] or "ñ" in s["artist"])
     print(f"Songs with special characters (spot check): {encoding_fixes}")
 
-    with open(OUTPUT_FILE, "w") as f:
-        json.dump(cleaned, f)
-    print(f"Written to {OUTPUT_FILE}")
+    compressed = gzip.compress(json.dumps(cleaned).encode("utf-8"), compresslevel=9)
+    with open(OUTPUT_FILE, "wb") as f:
+        f.write(compressed)
+    print(f"Written to {OUTPUT_FILE} ({len(compressed) / 1e6:.1f} MB gzipped)")
 
 
 if __name__ == "__main__":
