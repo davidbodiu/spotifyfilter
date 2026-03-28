@@ -5,6 +5,9 @@ const DAILY_BUCKETS = [0, 1000, 5000, 10000, 50000, 100000, 500000, 1000000, 500
 
 const PAGE_SIZE = 20;
 
+// Pre-sorted top 20 for instant display while full data loads
+const PRELOAD = [{"title":"Click Clack Symphony. (feat. Hans Zimmer)","artist":"RAYE (feat. Hans Zimmer)","totalStreams":9710354,"dailyStreams":1487680,"url":"https://open.spotify.com/track/5PspYmmQ8nKESNTcBY2LlX","popularity":153205.5},{"title":"Rethink Some Things","artist":"Luke Combs","totalStreams":5389187,"dailyStreams":752985,"url":"https://open.spotify.com/track/5LNgnMLXaoG9KRkL47KlZu","popularity":139721.4},{"title":"O Cheliya","artist":"A.R. Rahman","totalStreams":8100587,"dailyStreams":1094945,"url":"https://open.spotify.com/track/2wefgWu18PWceNuwLWNVZm","popularity":135168.6},{"title":"PONGO","artist":"Rvssian (feat. Rauw Alejandro, Wizkid)","totalStreams":5236651,"dailyStreams":706762,"url":"https://open.spotify.com/track/3vohqCtAozZw4ifTAtwbxu","popularity":134964.5},{"title":"SWIM","artist":"BTS","totalStreams":93988934,"dailyStreams":12310218,"url":"https://open.spotify.com/track/6nt3AoYjkaqXMZhypTBky1","popularity":130975.2},{"title":"SCANDIC","artist":"Quevedo","totalStreams":5696490,"dailyStreams":726014,"url":"https://open.spotify.com/track/7D2A3hvJSabgicJ1HM4kDi","popularity":127449.4},{"title":"NORMAL","artist":"BTS","totalStreams":37354605,"dailyStreams":4660023,"url":"https://open.spotify.com/track/4pcMA8zSATPOZzZd6fWI5N","popularity":124751.0},{"title":"Like Animals","artist":"BTS","totalStreams":35683319,"dailyStreams":4449997,"url":"https://open.spotify.com/track/1gvhtkVO3kvPnh8XcSkNGX","popularity":124708.0},{"title":"they don\u2019t know \u2019bout us","artist":"BTS","totalStreams":33178732,"dailyStreams":4021141,"url":"https://open.spotify.com/track/10MtjA4bGlP149TJSWEWjH","popularity":121196.3},{"title":"2.0","artist":"BTS","totalStreams":34569939,"dailyStreams":4171337,"url":"https://open.spotify.com/track/0H653Nkt1VcM5A5MC4N6Fw","popularity":120663.7},{"title":"FYA","artist":"BTS","totalStreams":39042216,"dailyStreams":4662627,"url":"https://open.spotify.com/track/329yzgp8DJT9WzUCGbegmq","popularity":119425.3},{"title":"Please","artist":"BTS","totalStreams":28412188,"dailyStreams":3385542,"url":"https://open.spotify.com/track/1I1QqHDHgnEDfeQ20QFWvj","popularity":119158.1},{"title":"Hooligan","artist":"BTS","totalStreams":40525212,"dailyStreams":4816440,"url":"https://open.spotify.com/track/2pXG8op1JYr4okRPu4I0Kx","popularity":118850.5},{"title":"Aliens","artist":"BTS","totalStreams":35717939,"dailyStreams":4240503,"url":"https://open.spotify.com/track/6ni7UZTJMh3R3Y69JdlNDC","popularity":118721.9},{"title":"One More Night","artist":"BTS","totalStreams":29290003,"dailyStreams":3458180,"url":"https://open.spotify.com/track/6J3aWRFGO0mxl2ckRcWMP5","popularity":118066.9},{"title":"Into the Sun","artist":"BTS","totalStreams":27000514,"dailyStreams":3144890,"url":"https://open.spotify.com/track/3mFWOqkxOecRIwcD7wIHcr","popularity":116475.2},{"title":"Merry Go Round","artist":"BTS","totalStreams":32827198,"dailyStreams":3792777,"url":"https://open.spotify.com/track/0iuC1cgzqw5yiHCgZE1QMp","popularity":115537.6},{"title":"Body to Body","artist":"BTS","totalStreams":50913805,"dailyStreams":5815136,"url":"https://open.spotify.com/track/02PyZNzTdzA1Nbxycnv93V","popularity":114215.3},{"title":"No. 29","artist":"BTS","totalStreams":26937015,"dailyStreams":2950569,"url":"https://open.spotify.com/track/31fmJmXLPdIax9kLUIvFKh","popularity":109535.9},{"title":"WORSHIP","artist":"Asake (feat. DJ Snake)","totalStreams":5696209,"dailyStreams":610140,"url":"https://open.spotify.com/track/7L1uMx4wG2A9pnRgb7hjQO","popularity":107113.3}];
+
 // State
 let allSongs = [];
 let filtered = [];
@@ -294,23 +297,26 @@ searchInput.addEventListener('keydown', (e) => {
 
 // Init
 async function init() {
+  // Setup sliders
+  setupSlider(totalMinSlider, totalMaxSlider, totalFill, totalMinLabel, totalMaxLabel, TOTAL_BUCKETS);
+  setupSlider(dailyMinSlider, dailyMaxSlider, dailyFill, dailyMinLabel, dailyMaxLabel, DAILY_BUCKETS);
+
+  // Show preloaded data instantly
+  allSongs = PRELOAD;
+  applyFilters();
+  resultsCount.textContent = 'Loading full dataset...';
+
+  // Load full dataset in background
   try {
     const res = await fetch('data.json.gz');
     const ds = new DecompressionStream('gzip');
     const decompressed = res.body.pipeThrough(ds);
     const text = await new Response(decompressed).text();
     allSongs = JSON.parse(text);
+    applyFilters();
   } catch (e) {
-    resultsCount.textContent = 'Failed to load data';
-    return;
+    resultsCount.textContent = 'Failed to load full dataset';
   }
-
-  // Setup sliders
-  setupSlider(totalMinSlider, totalMaxSlider, totalFill, totalMinLabel, totalMaxLabel, TOTAL_BUCKETS);
-  setupSlider(dailyMinSlider, dailyMaxSlider, dailyFill, dailyMinLabel, dailyMaxLabel, DAILY_BUCKETS);
-
-  // Initial render with all data
-  applyFilters();
 }
 
 init();
