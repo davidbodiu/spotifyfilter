@@ -30,12 +30,12 @@
         <div class="slider-container">
           <div class="slider-track" id="total-track">
             <div class="slider-fill" id="total-fill"></div>
-            <input type="range" id="total-min" class="slider slider-min" min="0" max="11" value="0">
-            <input type="range" id="total-max" class="slider slider-max" min="0" max="11" value="11">
+            <input type="range" id="total-min" class="slider slider-min" min="0" max="13" value="0">
+            <input type="range" id="total-max" class="slider slider-max" min="0" max="13" value="13">
           </div>
           <div class="slider-labels">
             <span id="total-min-label">0</span>
-            <span id="total-max-label">1B+</span>
+            <span id="total-max-label">5B+</span>
           </div>
         </div>
       </div>
@@ -53,6 +53,18 @@
             <span id="daily-max-label">5M+</span>
           </div>
         </div>
+      </div>
+
+      <div class="filter-group">
+        <label>Sort by</label>
+        <select id="sort-select">
+          <option value="totalStreams-desc">Total Streams (High → Low)</option>
+          <option value="totalStreams-asc">Total Streams (Low → High)</option>
+          <option value="dailyStreams-desc">Daily Streams (High → Low)</option>
+          <option value="dailyStreams-asc">Daily Streams (Low → High)</option>
+          <option value="popularity-desc">Popularity (High → Low)</option>
+          <option value="popularity-asc">Popularity (Low → High)</option>
+        </select>
       </div>
 
       <div class="filter-actions">

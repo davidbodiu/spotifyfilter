@@ -1,5 +1,5 @@
 // Bucket definitions
-const TOTAL_BUCKETS = [0, 10000, 50000, 100000, 500000, 1000000, 5000000, 10000000, 50000000, 100000000, 500000000, 1000000000];
+const TOTAL_BUCKETS = [0, 10000, 50000, 100000, 500000, 1000000, 5000000, 10000000, 50000000, 100000000, 500000000, 1000000000, 2000000000, 5000000000];
 const DAILY_BUCKETS = [0, 1000, 5000, 10000, 50000, 100000, 500000, 1000000, 5000000];
 
 const PAGE_SIZE = 20;
@@ -23,6 +23,7 @@ const dailyMinLabel = document.getElementById('daily-min-label');
 const dailyMaxLabel = document.getElementById('daily-max-label');
 const totalFill = document.getElementById('total-fill');
 const dailyFill = document.getElementById('daily-fill');
+const sortSelect = document.getElementById('sort-select');
 const applyBtn = document.getElementById('apply-btn');
 const resetBtn = document.getElementById('reset-btn');
 const resultsCount = document.getElementById('results-count');
@@ -88,6 +89,10 @@ function setupSlider(minSlider, maxSlider, fill, minLabel, maxLabel, buckets) {
 
 // Filtering
 function applyFilters() {
+  const [key, dir] = sortSelect.value.split('-');
+  sortKey = key;
+  sortDir = dir;
+
   const query = searchInput.value.toLowerCase().trim();
   const totalMin = TOTAL_BUCKETS[parseInt(totalMinSlider.value)];
   const totalMaxIdx = parseInt(totalMaxSlider.value);
@@ -256,6 +261,7 @@ function escapeHtml(str) {
 // Reset
 function resetFilters() {
   searchInput.value = '';
+  sortSelect.value = 'totalStreams-desc';
   totalMinSlider.value = 0;
   totalMaxSlider.value = TOTAL_BUCKETS.length - 1;
   dailyMinSlider.value = 0;
