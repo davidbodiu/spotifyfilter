@@ -1,5 +1,6 @@
 // Bucket definitions
-const TOTAL_BUCKETS = [0, 10000, 50000, 100000, 500000, 1000000, 5000000, 10000000, 50000000, 100000000, 500000000, 1000000000, 2000000000, 5000000000];
+const TOTAL_BUCKETS = [0, 10000, 50000, 100000, 500000, 1000000, 2000000, 5000000, 10000000, 50000000, 100000000, 500000000, 1000000000, 2000000000, 5000000000];
+const DEFAULT_TOTAL_MIN = 7; // 5M
 const DAILY_BUCKETS = [0, 1000, 5000, 10000, 50000, 100000, 500000, 1000000, 5000000];
 
 const PAGE_SIZE = 20;
@@ -8,7 +9,7 @@ const PAGE_SIZE = 20;
 let allSongs = [];
 let filtered = [];
 let currentPage = 1;
-let sortKey = 'totalStreams';
+let sortKey = 'popularity';
 let sortDir = 'desc';
 
 // DOM refs
@@ -162,8 +163,8 @@ function render() {
     const embedUrl = song.url ? song.url.replace('open.spotify.com/track/', 'open.spotify.com/embed/track/') + '?utm_source=generator&theme=0' : '';
     tr.innerHTML = `
       <td>${start + i + 1}</td>
-      <td>${escapeHtml(song.title)}</td>
-      <td>${escapeHtml(song.artist)}</td>
+      <td>${truncate(song.title, 45)}</td>
+      <td>${truncate(song.artist, 35)}</td>
       <td title="${fullFormat(song.totalStreams)}">${abbreviate(song.totalStreams)}</td>
       <td title="${fullFormat(song.dailyStreams)}">${abbreviate(song.dailyStreams)}</td>
       <td class="embed-cell">${embedUrl ? `<iframe src="${embedUrl}" width="300" height="152" frameborder="0" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="lazy"></iframe>` : '<span class="no-preview">No preview</span>'}</td>
@@ -258,11 +259,16 @@ function escapeHtml(str) {
   return div.innerHTML;
 }
 
+function truncate(str, max) {
+  if (str.length <= max) return escapeHtml(str);
+  return `<span title="${escapeHtml(str)}">${escapeHtml(str.slice(0, max))}…</span>`;
+}
+
 // Reset
 function resetFilters() {
   searchInput.value = '';
-  sortSelect.value = 'totalStreams-desc';
-  totalMinSlider.value = 0;
+  sortSelect.value = 'popularity-desc';
+  totalMinSlider.value = DEFAULT_TOTAL_MIN;
   totalMaxSlider.value = TOTAL_BUCKETS.length - 1;
   dailyMinSlider.value = 0;
   dailyMaxSlider.value = DAILY_BUCKETS.length - 1;
