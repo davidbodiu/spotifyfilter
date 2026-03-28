@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Spotify Stream Filter</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="app">
+    <header class="header">
+      <div class="logo">
+        <svg viewBox="0 0 24 24" width="32" height="32" fill="#1DB954">
+          <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381C8.64 5.801 15.6 6.06 20.04 8.7c.5.3.7 1.02.4 1.56-.301.42-1.02.599-1.459.42z"/>
+        </svg>
+        <h1>Stream Filter</h1>
+      </div>
+    </header>
+
+    <section class="filters">
+      <div class="filter-group">
+        <label>Search by title or artist</label>
+        <input type="text" id="search-input" placeholder="e.g. Drake, Blinding Lights...">
+      </div>
+
+      <div class="filter-group">
+        <label>Total Streams</label>
+        <div class="slider-container">
+          <div class="slider-track" id="total-track">
+            <div class="slider-fill" id="total-fill"></div>
+            <input type="range" id="total-min" class="slider slider-min" min="0" max="11" value="0">
+            <input type="range" id="total-max" class="slider slider-max" min="0" max="11" value="11">
+          </div>
+          <div class="slider-labels">
+            <span id="total-min-label">0</span>
+            <span id="total-max-label">1B+</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="filter-group">
+        <label>Daily Streams</label>
+        <div class="slider-container">
+          <div class="slider-track" id="daily-track">
+            <div class="slider-fill" id="daily-fill"></div>
+            <input type="range" id="daily-min" class="slider slider-min" min="0" max="8" value="0">
+            <input type="range" id="daily-max" class="slider slider-max" min="0" max="8" value="8">
+          </div>
+          <div class="slider-labels">
+            <span id="daily-min-label">0</span>
+            <span id="daily-max-label">5M+</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="filter-actions">
+        <button id="apply-btn">Apply Filters</button>
+        <button id="reset-btn" class="secondary">Reset</button>
+      </div>
+    </section>
+
+    <section class="results">
+      <div class="results-header">
+        <span id="results-count"></span>
+      </div>
+      <div class="table-wrapper">
+        <table id="results-table">
+          <thead>
+            <tr>
+              <th class="col-rank">#</th>
+              <th class="col-title">Title</th>
+              <th class="col-artist">Artist</th>
+              <th class="col-streams">Total Streams</th>
+              <th class="col-streams">Daily Streams</th>
+              <th class="col-preview">Preview</th>
+            </tr>
+          </thead>
+          <tbody id="results-body"></tbody>
+        </table>
+      </div>
+      <div class="mobile-cards" id="mobile-cards"></div>
+      <div id="no-results" class="no-results" style="display:none;">No songs match your filters</div>
+      <div class="pagination" id="pagination"></div>
+    </section>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
