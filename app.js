@@ -1,22 +1,26 @@
 // Bucket definitions
 const TOTAL_BUCKETS = [0, 10000, 50000, 100000, 500000, 1000000, 2000000, 5000000, 10000000, 50000000, 100000000, 500000000, 1000000000, 2000000000, 5000000000];
-const DEFAULT_TOTAL_MIN = 7; // 5M
 const DAILY_BUCKETS = [0, 1000, 5000, 10000, 50000, 100000, 500000, 1000000, 5000000];
 
 const PAGE_SIZE = 10;
+const DEFAULT_ARTIST = 'Billie Eilish';
 
-// Pre-sorted top 20 for instant display while full data loads
-const PRELOAD = [{"title":"Click Clack Symphony. (feat. Hans Zimmer)","artist":"RAYE (feat. Hans Zimmer)","totalStreams":9710354,"dailyStreams":1487680,"url":"https://open.spotify.com/track/5PspYmmQ8nKESNTcBY2LlX","popularity":153205.5},{"title":"Rethink Some Things","artist":"Luke Combs","totalStreams":5389187,"dailyStreams":752985,"url":"https://open.spotify.com/track/5LNgnMLXaoG9KRkL47KlZu","popularity":139721.4},{"title":"O Cheliya","artist":"A.R. Rahman","totalStreams":8100587,"dailyStreams":1094945,"url":"https://open.spotify.com/track/2wefgWu18PWceNuwLWNVZm","popularity":135168.6},{"title":"PONGO","artist":"Rvssian (feat. Rauw Alejandro, Wizkid)","totalStreams":5236651,"dailyStreams":706762,"url":"https://open.spotify.com/track/3vohqCtAozZw4ifTAtwbxu","popularity":134964.5},{"title":"SWIM","artist":"BTS","totalStreams":93988934,"dailyStreams":12310218,"url":"https://open.spotify.com/track/6nt3AoYjkaqXMZhypTBky1","popularity":130975.2},{"title":"SCANDIC","artist":"Quevedo","totalStreams":5696490,"dailyStreams":726014,"url":"https://open.spotify.com/track/7D2A3hvJSabgicJ1HM4kDi","popularity":127449.4},{"title":"NORMAL","artist":"BTS","totalStreams":37354605,"dailyStreams":4660023,"url":"https://open.spotify.com/track/4pcMA8zSATPOZzZd6fWI5N","popularity":124751.0},{"title":"Like Animals","artist":"BTS","totalStreams":35683319,"dailyStreams":4449997,"url":"https://open.spotify.com/track/1gvhtkVO3kvPnh8XcSkNGX","popularity":124708.0},{"title":"they don\u2019t know \u2019bout us","artist":"BTS","totalStreams":33178732,"dailyStreams":4021141,"url":"https://open.spotify.com/track/10MtjA4bGlP149TJSWEWjH","popularity":121196.3},{"title":"2.0","artist":"BTS","totalStreams":34569939,"dailyStreams":4171337,"url":"https://open.spotify.com/track/0H653Nkt1VcM5A5MC4N6Fw","popularity":120663.7},{"title":"FYA","artist":"BTS","totalStreams":39042216,"dailyStreams":4662627,"url":"https://open.spotify.com/track/329yzgp8DJT9WzUCGbegmq","popularity":119425.3},{"title":"Please","artist":"BTS","totalStreams":28412188,"dailyStreams":3385542,"url":"https://open.spotify.com/track/1I1QqHDHgnEDfeQ20QFWvj","popularity":119158.1},{"title":"Hooligan","artist":"BTS","totalStreams":40525212,"dailyStreams":4816440,"url":"https://open.spotify.com/track/2pXG8op1JYr4okRPu4I0Kx","popularity":118850.5},{"title":"Aliens","artist":"BTS","totalStreams":35717939,"dailyStreams":4240503,"url":"https://open.spotify.com/track/6ni7UZTJMh3R3Y69JdlNDC","popularity":118721.9},{"title":"One More Night","artist":"BTS","totalStreams":29290003,"dailyStreams":3458180,"url":"https://open.spotify.com/track/6J3aWRFGO0mxl2ckRcWMP5","popularity":118066.9},{"title":"Into the Sun","artist":"BTS","totalStreams":27000514,"dailyStreams":3144890,"url":"https://open.spotify.com/track/3mFWOqkxOecRIwcD7wIHcr","popularity":116475.2},{"title":"Merry Go Round","artist":"BTS","totalStreams":32827198,"dailyStreams":3792777,"url":"https://open.spotify.com/track/0iuC1cgzqw5yiHCgZE1QMp","popularity":115537.6},{"title":"Body to Body","artist":"BTS","totalStreams":50913805,"dailyStreams":5815136,"url":"https://open.spotify.com/track/02PyZNzTdzA1Nbxycnv93V","popularity":114215.3},{"title":"No. 29","artist":"BTS","totalStreams":26937015,"dailyStreams":2950569,"url":"https://open.spotify.com/track/31fmJmXLPdIax9kLUIvFKh","popularity":109535.9},{"title":"WORSHIP","artist":"Asake (feat. DJ Snake)","totalStreams":5696209,"dailyStreams":610140,"url":"https://open.spotify.com/track/7L1uMx4wG2A9pnRgb7hjQO","popularity":107113.3}];
+// Billie Eilish preload for instant display (sorted by total streams)
+const PRELOAD = [{"title":"lovely (with Khalid)","artist":"Billie Eilish (feat. Khalid)","totalStreams":3700286167,"dailyStreams":1127974,"url":"https://open.spotify.com/track/0u2P5u6lvoDfwTYjAADbn4","popularity":304.8},{"title":"BIRDS OF A FEATHER","artist":"Billie Eilish","totalStreams":3591941979,"dailyStreams":2455063,"url":"https://open.spotify.com/track/6dOtVTDdiauQNBQEDOtlAB","popularity":683.5},{"title":"bad guy","artist":"Billie Eilish, Justin Bieber","totalStreams":2894198114,"dailyStreams":489843,"url":"https://open.spotify.com/track/2Fxmhks0bxGSBdJ92vM42m","popularity":169.2},{"title":"when the party's over","artist":"Billie Eilish","totalStreams":2458161755,"dailyStreams":723958,"url":"https://open.spotify.com/track/43zdsphuZLzwA9k4DJhU0I","popularity":294.5},{"title":"ocean eyes","artist":"Billie Eilish","totalStreams":2146404624,"dailyStreams":1068260,"url":"https://open.spotify.com/track/2uIX8YMNjGMD7441kqyyNU","popularity":497.7},{"title":"everything i wanted","artist":"Billie Eilish","totalStreams":2085899148,"dailyStreams":613771,"url":"https://open.spotify.com/track/3ZCTVFBt2Brf31RLEnCkWJ","popularity":294.2},{"title":"WILDFLOWER","artist":"Billie Eilish","totalStreams":1969890866,"dailyStreams":1986809,"url":"https://open.spotify.com/track/3QaPy1KgI7nu9FJEQUgn6h","popularity":1008.6},{"title":"Happier Than Ever","artist":"Billie Eilish","totalStreams":1809941834,"dailyStreams":672676,"url":"https://open.spotify.com/track/4RVwu0g32PAqgUiJoXsdF8","popularity":371.7},{"title":"What Was I Made For? [From The Motion Picture \"Barbie\"]","artist":"Billie Eilish","totalStreams":1573453372,"dailyStreams":696600,"url":"https://open.spotify.com/track/6wf7Yu7cxBSPrRlWeSeK0Q","popularity":442.7},{"title":"idontwannabeyouanymore","artist":"Billie Eilish","totalStreams":1350643575,"dailyStreams":348429,"url":"https://open.spotify.com/track/40T5GIqQ1CegGm2PTEl8Bu","popularity":258.0}];
 
 // State
 let allSongs = [];
+let artistIndex = {};  // { "artist name lowercase": { name: "Display Name", count: N } }
+let selectedArtist = DEFAULT_ARTIST;
 let filtered = [];
 let currentPage = 1;
-let sortKey = 'popularity';
+let sortKey = 'totalStreams';
 let sortDir = 'desc';
+let highlightedIdx = -1;
 
 // DOM refs
-const searchInput = document.getElementById('search-input');
+const artistInput = document.getElementById('artist-input');
+const artistDropdown = document.getElementById('artist-dropdown');
 const totalMinSlider = document.getElementById('total-min');
 const totalMaxSlider = document.getElementById('total-max');
 const dailyMinSlider = document.getElementById('daily-min');
@@ -28,8 +32,6 @@ const dailyMaxLabel = document.getElementById('daily-max-label');
 const totalFill = document.getElementById('total-fill');
 const dailyFill = document.getElementById('daily-fill');
 const sortSelect = document.getElementById('sort-select');
-const applyBtn = document.getElementById('apply-btn');
-const resetBtn = document.getElementById('reset-btn');
 const resultsCount = document.getElementById('results-count');
 const resultsBody = document.getElementById('results-body');
 const noResults = document.getElementById('no-results');
@@ -91,13 +93,55 @@ function setupSlider(minSlider, maxSlider, fill, minLabel, maxLabel, buckets) {
   update();
 }
 
-// Filtering
+// Build artist index from all songs
+function buildArtistIndex() {
+  artistIndex = {};
+  for (const song of allSongs) {
+    const artistStr = song.artist;
+    // Extract individual artist names
+    const names = parseArtistNames(artistStr);
+    for (const name of names) {
+      const key = name.toLowerCase();
+      if (!artistIndex[key]) {
+        artistIndex[key] = { name: name, count: 0 };
+      }
+      artistIndex[key].count++;
+    }
+  }
+}
+
+function parseArtistNames(artistStr) {
+  // "Drake (feat. WizKid, Kyla)" -> ["Drake", "WizKid", "Kyla"]
+  const names = [];
+  const featMatch = artistStr.match(/^(.*?)(?:\s*\(feat\.\s*(.*)\))?$/);
+  if (featMatch) {
+    const leads = featMatch[1].split(',').map(s => s.trim()).filter(Boolean);
+    names.push(...leads);
+    if (featMatch[2]) {
+      const feats = featMatch[2].split(',').map(s => s.trim()).filter(Boolean);
+      names.push(...feats);
+    }
+  } else {
+    names.push(artistStr.trim());
+  }
+  return names;
+}
+
+// Filter songs by selected artist
+function songsForArtist(artistName) {
+  const lower = artistName.toLowerCase();
+  return allSongs.filter(song => {
+    const names = parseArtistNames(song.artist).map(n => n.toLowerCase());
+    return names.includes(lower);
+  });
+}
+
+// Apply filters + sort on current artist's songs
 function applyFilters() {
   const [key, dir] = sortSelect.value.split('-');
   sortKey = key;
   sortDir = dir;
 
-  const query = searchInput.value.toLowerCase().trim();
   const totalMin = TOTAL_BUCKETS[parseInt(totalMinSlider.value)];
   const totalMaxIdx = parseInt(totalMaxSlider.value);
   const totalMax = totalMaxIdx === TOTAL_BUCKETS.length - 1 ? Infinity : TOTAL_BUCKETS[totalMaxIdx];
@@ -105,10 +149,8 @@ function applyFilters() {
   const dailyMaxIdx = parseInt(dailyMaxSlider.value);
   const dailyMax = dailyMaxIdx === DAILY_BUCKETS.length - 1 ? Infinity : DAILY_BUCKETS[dailyMaxIdx];
 
-  filtered = allSongs.filter(song => {
-    if (query && !song.title.toLowerCase().includes(query) && !song.artist.toLowerCase().includes(query)) {
-      return false;
-    }
+  const artistSongs = songsForArtist(selectedArtist);
+  filtered = artistSongs.filter(song => {
     if (song.totalStreams < totalMin || song.totalStreams > totalMax) return false;
     if (song.dailyStreams < dailyMin || song.dailyStreams > dailyMax) return false;
     return true;
@@ -117,6 +159,13 @@ function applyFilters() {
   sortFiltered();
   currentPage = 1;
   render();
+}
+
+function selectArtist(name) {
+  selectedArtist = name;
+  artistInput.value = name;
+  closeDropdown();
+  applyFilters();
 }
 
 // Sorting
@@ -154,7 +203,7 @@ function render() {
     tableWrapper.style.display = 'none';
     mobileCards.innerHTML = '';
   } else {
-    resultsCount.textContent = `Showing ${start + 1}\u2013${end} of ${totalResults.toLocaleString()} results`;
+    resultsCount.textContent = `${escapeHtml(selectedArtist)} \u2014 Showing ${start + 1}\u2013${end} of ${totalResults.toLocaleString()} songs`;
     noResults.style.display = 'none';
     tableWrapper.style.display = '';
   }
@@ -181,13 +230,13 @@ function render() {
 
   // Mobile cards
   mobileCards.innerHTML = '';
-  page.forEach((song, i) => {
+  page.forEach((song, j) => {
     const embedUrl = song.url ? song.url.replace('open.spotify.com/track/', 'open.spotify.com/embed/track/') + '?utm_source=generator&theme=0' : '';
     const card = document.createElement('div');
     card.className = 'song-card';
     card.innerHTML = `
       <div class="song-card-top">
-        <span class="song-card-rank">${start + i + 1}</span>
+        <span class="song-card-rank">${start + j + 1}</span>
         ${embedUrl ? `<div class="song-card-embed"><iframe src="${embedUrl}" height="152" frameborder="0" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="lazy"></iframe></div>` : ''}
       </div>
       <div class="song-card-streams">
@@ -268,36 +317,113 @@ function escapeHtml(str) {
 
 function truncate(str, max) {
   if (str.length <= max) return escapeHtml(str);
-  return `<span title="${escapeHtml(str)}">${escapeHtml(str.slice(0, max))}…</span>`;
+  return `<span title="${escapeHtml(str)}">${escapeHtml(str.slice(0, max))}\u2026</span>`;
 }
 
-// Reset
-function resetFilters() {
-  searchInput.value = '';
-  sortSelect.value = 'popularity-desc';
-  totalMinSlider.value = DEFAULT_TOTAL_MIN;
-  totalMaxSlider.value = TOTAL_BUCKETS.length - 1;
-  dailyMinSlider.value = 0;
-  dailyMaxSlider.value = DAILY_BUCKETS.length - 1;
-
-  // Trigger slider UI updates
-  totalMinSlider.dispatchEvent(new Event('input'));
-  totalMaxSlider.dispatchEvent(new Event('input'));
-  dailyMinSlider.dispatchEvent(new Event('input'));
-  dailyMaxSlider.dispatchEvent(new Event('input'));
-
-  applyFilters();
+// Artist dropdown
+function showDropdown(matches) {
+  artistDropdown.innerHTML = '';
+  highlightedIdx = -1;
+  if (matches.length === 0) {
+    closeDropdown();
+    return;
+  }
+  matches.forEach((m, i) => {
+    const div = document.createElement('div');
+    div.className = 'artist-option';
+    div.innerHTML = `<span class="artist-option-name">${escapeHtml(m.name)}</span><span class="artist-option-count">${m.count} songs</span>`;
+    div.addEventListener('mousedown', (e) => {
+      e.preventDefault(); // prevent blur from firing before click
+      selectArtist(m.name);
+    });
+    artistDropdown.appendChild(div);
+  });
+  artistDropdown.classList.add('open');
 }
 
+function closeDropdown() {
+  artistDropdown.classList.remove('open');
+  highlightedIdx = -1;
+}
 
-// Button listeners
-applyBtn.addEventListener('click', applyFilters);
-resetBtn.addEventListener('click', resetFilters);
+function highlightOption(idx) {
+  const options = artistDropdown.querySelectorAll('.artist-option');
+  options.forEach(o => o.classList.remove('highlighted'));
+  if (idx >= 0 && idx < options.length) {
+    options[idx].classList.add('highlighted');
+    options[idx].scrollIntoView({ block: 'nearest' });
+  }
+  highlightedIdx = idx;
+}
 
-// Enter key triggers apply
-searchInput.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') applyFilters();
+artistInput.addEventListener('input', () => {
+  const query = artistInput.value.toLowerCase().trim();
+  if (query.length < 1) {
+    closeDropdown();
+    return;
+  }
+
+  // Search artist index
+  const matches = [];
+  for (const key in artistIndex) {
+    if (key.includes(query)) {
+      matches.push(artistIndex[key]);
+    }
+  }
+  // Sort: exact start match first, then by song count
+  matches.sort((a, b) => {
+    const aStarts = a.name.toLowerCase().startsWith(query) ? 0 : 1;
+    const bStarts = b.name.toLowerCase().startsWith(query) ? 0 : 1;
+    if (aStarts !== bStarts) return aStarts - bStarts;
+    return b.count - a.count;
+  });
+
+  showDropdown(matches.slice(0, 15));
 });
+
+artistInput.addEventListener('focus', () => {
+  artistInput.select();
+});
+
+artistInput.addEventListener('blur', () => {
+  closeDropdown();
+  // Restore selected artist name if input was cleared/changed without selecting
+  artistInput.value = selectedArtist;
+});
+
+artistInput.addEventListener('keydown', (e) => {
+  const options = artistDropdown.querySelectorAll('.artist-option');
+  if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    highlightOption(Math.min(highlightedIdx + 1, options.length - 1));
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    highlightOption(Math.max(highlightedIdx - 1, 0));
+  } else if (e.key === 'Enter') {
+    e.preventDefault();
+    if (highlightedIdx >= 0 && highlightedIdx < options.length) {
+      const name = options[highlightedIdx].querySelector('.artist-option-name').textContent;
+      selectArtist(name);
+    }
+  } else if (e.key === 'Escape') {
+    closeDropdown();
+    artistInput.blur();
+  }
+});
+
+// Filters toggle
+const filtersToggle = document.getElementById('filters-toggle');
+const filterRow = document.getElementById('filter-row');
+
+filtersToggle.addEventListener('click', (e) => {
+  e.preventDefault();
+  const open = filterRow.style.display !== 'none';
+  filterRow.style.display = open ? 'none' : '';
+  filtersToggle.classList.toggle('open', !open);
+});
+
+// Apply button
+document.getElementById('apply-btn').addEventListener('click', applyFilters);
 
 // Init
 async function init() {
@@ -307,6 +433,7 @@ async function init() {
 
   // Show preloaded data instantly
   allSongs = PRELOAD;
+  artistInput.value = DEFAULT_ARTIST;
   applyFilters();
   resultsCount.textContent = 'Loading full dataset...';
 
@@ -317,6 +444,7 @@ async function init() {
     const decompressed = res.body.pipeThrough(ds);
     const text = await new Response(decompressed).text();
     allSongs = JSON.parse(text);
+    buildArtistIndex();
     applyFilters();
   } catch (e) {
     resultsCount.textContent = 'Failed to load full dataset';

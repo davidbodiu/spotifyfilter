@@ -67,7 +67,12 @@ body {
   margin-bottom: 8px;
 }
 
-#search-input {
+/* Artist Search */
+.artist-search-wrapper {
+  position: relative;
+}
+
+#artist-input {
   width: 100%;
   padding: 10px 14px;
   border-radius: 8px;
@@ -80,12 +85,116 @@ body {
   transition: border-color 0.2s;
 }
 
-#search-input::placeholder {
+#artist-input::placeholder {
   color: #666;
 }
 
-#search-input:focus {
+#artist-input:focus {
   border-color: var(--green);
+}
+
+.artist-dropdown {
+  display: none;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: var(--card);
+  border: 1px solid #333;
+  border-top: none;
+  border-radius: 0 0 8px 8px;
+  max-height: 280px;
+  overflow-y: auto;
+  z-index: 100;
+}
+
+.artist-dropdown.open {
+  display: block;
+}
+
+.artist-option {
+  padding: 10px 14px;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 14px;
+  transition: background 0.1s;
+}
+
+.artist-option:hover,
+.artist-option.highlighted {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.artist-option-name {
+  color: var(--white);
+}
+
+.artist-option-count {
+  color: var(--gray);
+  font-size: 12px;
+  flex-shrink: 0;
+  margin-left: 12px;
+}
+
+.filters-toggle {
+  color: var(--gray);
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  text-decoration: none;
+  transition: color 0.2s;
+  cursor: pointer;
+}
+
+.filters-toggle:hover {
+  color: var(--green);
+}
+
+.toggle-arrow {
+  display: inline-block;
+  transition: transform 0.2s;
+  font-size: 14px;
+}
+
+.filters-toggle.open .toggle-arrow {
+  transform: rotate(180deg);
+}
+
+.filter-row {
+  display: flex;
+  gap: 20px;
+}
+
+.filter-group-inline {
+  flex: 1;
+}
+
+.filter-apply-wrapper {
+  flex: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.filter-apply-wrapper #apply-btn {
+  padding: 10px 24px;
+  border-radius: 20px;
+  border: none;
+  background: var(--green);
+  color: var(--black);
+  font-family: var(--font);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.2s, transform 0.1s;
+}
+
+.filter-apply-wrapper #apply-btn:hover {
+  background: var(--green-hover);
+  transform: scale(1.02);
 }
 
 /* Slider */
@@ -459,13 +568,8 @@ tr {
     padding: 16px;
   }
 
-  .filter-actions {
+  .filter-row {
     flex-direction: column;
-  }
-
-  #apply-btn, #reset-btn {
-    width: 100%;
-    text-align: center;
   }
 
   .slider::-webkit-slider-thumb {
