@@ -4,6 +4,7 @@ const DAILY_BUCKETS = [0, 1000, 5000, 10000, 50000, 100000, 500000, 1000000, 500
 
 const PAGE_SIZE = 10;
 const DEFAULT_ARTIST = 'Billie Eilish';
+const SHOW_STREAM_SLIDERS = false;
 
 // Billie Eilish preload for instant display (sorted by total streams)
 const PRELOAD = [{"title":"lovely (with Khalid)","artist":"Billie Eilish (feat. Khalid)","totalStreams":3700286167,"dailyStreams":1127974,"url":"https://open.spotify.com/track/0u2P5u6lvoDfwTYjAADbn4","popularity":304.8},{"title":"BIRDS OF A FEATHER","artist":"Billie Eilish","totalStreams":3591941979,"dailyStreams":2455063,"url":"https://open.spotify.com/track/6dOtVTDdiauQNBQEDOtlAB","popularity":683.5},{"title":"bad guy","artist":"Billie Eilish, Justin Bieber","totalStreams":2894198114,"dailyStreams":489843,"url":"https://open.spotify.com/track/2Fxmhks0bxGSBdJ92vM42m","popularity":169.2},{"title":"when the party's over","artist":"Billie Eilish","totalStreams":2458161755,"dailyStreams":723958,"url":"https://open.spotify.com/track/43zdsphuZLzwA9k4DJhU0I","popularity":294.5},{"title":"ocean eyes","artist":"Billie Eilish","totalStreams":2146404624,"dailyStreams":1068260,"url":"https://open.spotify.com/track/2uIX8YMNjGMD7441kqyyNU","popularity":497.7},{"title":"everything i wanted","artist":"Billie Eilish","totalStreams":2085899148,"dailyStreams":613771,"url":"https://open.spotify.com/track/3ZCTVFBt2Brf31RLEnCkWJ","popularity":294.2},{"title":"WILDFLOWER","artist":"Billie Eilish","totalStreams":1969890866,"dailyStreams":1986809,"url":"https://open.spotify.com/track/3QaPy1KgI7nu9FJEQUgn6h","popularity":1008.6},{"title":"Happier Than Ever","artist":"Billie Eilish","totalStreams":1809941834,"dailyStreams":672676,"url":"https://open.spotify.com/track/4RVwu0g32PAqgUiJoXsdF8","popularity":371.7},{"title":"What Was I Made For? [From The Motion Picture \"Barbie\"]","artist":"Billie Eilish","totalStreams":1573453372,"dailyStreams":696600,"url":"https://open.spotify.com/track/6wf7Yu7cxBSPrRlWeSeK0Q","popularity":442.7},{"title":"idontwannabeyouanymore","artist":"Billie Eilish","totalStreams":1350643575,"dailyStreams":348429,"url":"https://open.spotify.com/track/40T5GIqQ1CegGm2PTEl8Bu","popularity":258.0}];
@@ -21,16 +22,6 @@ let highlightedIdx = -1;
 // DOM refs
 const artistInput = document.getElementById('artist-input');
 const artistDropdown = document.getElementById('artist-dropdown');
-const totalMinSlider = document.getElementById('total-min');
-const totalMaxSlider = document.getElementById('total-max');
-const dailyMinSlider = document.getElementById('daily-min');
-const dailyMaxSlider = document.getElementById('daily-max');
-const totalMinLabel = document.getElementById('total-min-label');
-const totalMaxLabel = document.getElementById('total-max-label');
-const dailyMinLabel = document.getElementById('daily-min-label');
-const dailyMaxLabel = document.getElementById('daily-max-label');
-const totalFill = document.getElementById('total-fill');
-const dailyFill = document.getElementById('daily-fill');
 const sortSelect = document.getElementById('sort-select');
 const resultsCount = document.getElementById('results-count');
 const resultsBody = document.getElementById('results-body');
@@ -51,43 +42,30 @@ function fullFormat(n) {
   return n.toLocaleString();
 }
 
+// Slider logic (disabled when SHOW_STREAM_SLIDERS = false)
 function bucketLabel(value) {
   if (value === 0) return '0';
-  return abbreviate(value) + (value === TOTAL_BUCKETS[TOTAL_BUCKETS.length - 1] || value === DAILY_BUCKETS[DAILY_BUCKETS.length - 1] ? '+' : '');
+  return abbreviate(value) + '+';
 }
 
-// Slider logic
 function updateSliderFill(minSlider, maxSlider, fill) {
   const max = parseInt(minSlider.max);
   const minVal = parseInt(minSlider.value);
   const maxVal = parseInt(maxSlider.value);
-  const left = (minVal / max) * 100;
-  const right = (maxVal / max) * 100;
-  fill.style.left = left + '%';
-  fill.style.width = (right - left) + '%';
+  fill.style.left = (minVal / max) * 100 + '%';
+  fill.style.width = ((maxVal - minVal) / max) * 100 + '%';
 }
 
 function setupSlider(minSlider, maxSlider, fill, minLabel, maxLabel, buckets) {
   function update() {
     let minVal = parseInt(minSlider.value);
     let maxVal = parseInt(maxSlider.value);
-
-    if (minVal > maxVal) {
-      minSlider.value = maxVal;
-      minVal = maxVal;
-    }
-    if (maxVal < minVal) {
-      maxSlider.value = minVal;
-      maxVal = minVal;
-    }
-
+    if (minVal > maxVal) { minSlider.value = maxVal; minVal = maxVal; }
+    if (maxVal < minVal) { maxSlider.value = minVal; maxVal = minVal; }
     minLabel.textContent = bucketLabel(buckets[minVal]);
-    const isMaxBucket = maxVal === buckets.length - 1;
-    maxLabel.textContent = abbreviate(buckets[maxVal]) + (isMaxBucket ? '+' : '');
-
+    maxLabel.textContent = abbreviate(buckets[maxVal]) + (maxVal === buckets.length - 1 ? '+' : '');
     updateSliderFill(minSlider, maxSlider, fill);
   }
-
   minSlider.addEventListener('input', update);
   maxSlider.addEventListener('input', update);
   update();
@@ -142,19 +120,7 @@ function applyFilters() {
   sortKey = key;
   sortDir = dir;
 
-  const totalMin = TOTAL_BUCKETS[parseInt(totalMinSlider.value)];
-  const totalMaxIdx = parseInt(totalMaxSlider.value);
-  const totalMax = totalMaxIdx === TOTAL_BUCKETS.length - 1 ? Infinity : TOTAL_BUCKETS[totalMaxIdx];
-  const dailyMin = DAILY_BUCKETS[parseInt(dailyMinSlider.value)];
-  const dailyMaxIdx = parseInt(dailyMaxSlider.value);
-  const dailyMax = dailyMaxIdx === DAILY_BUCKETS.length - 1 ? Infinity : DAILY_BUCKETS[dailyMaxIdx];
-
-  const artistSongs = songsForArtist(selectedArtist);
-  filtered = artistSongs.filter(song => {
-    if (song.totalStreams < totalMin || song.totalStreams > totalMax) return false;
-    if (song.dailyStreams < dailyMin || song.dailyStreams > dailyMax) return false;
-    return true;
-  });
+  filtered = songsForArtist(selectedArtist);
 
   sortFiltered();
   currentPage = 1;
@@ -427,10 +393,6 @@ document.getElementById('apply-btn').addEventListener('click', applyFilters);
 
 // Init
 async function init() {
-  // Setup sliders
-  setupSlider(totalMinSlider, totalMaxSlider, totalFill, totalMinLabel, totalMaxLabel, TOTAL_BUCKETS);
-  setupSlider(dailyMinSlider, dailyMaxSlider, dailyFill, dailyMinLabel, dailyMaxLabel, DAILY_BUCKETS);
-
   // Show preloaded data instantly
   allSongs = PRELOAD;
   artistInput.value = DEFAULT_ARTIST;
