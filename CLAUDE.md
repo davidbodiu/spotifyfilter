@@ -10,13 +10,15 @@ The pitch, per the meta description: go beyond the top 10 that Spotify shows you
 
 ## Maintenance protocol (read this first)
 
-Three files document this project. **All three must be updated after every request.**
+Five files document this project. **All five must be updated after every request.**
 
 | File | Purpose | Update rule |
 |---|---|---|
-| `CLAUDE.md` | This file. Comprehensive app summary. | Update whenever behaviour, architecture, constants, or conventions change. |
-| `requests.md` | Log of every request the user has made. | Append a new entry for every request, including ones that changed no code. |
+| `CLAUDE.md` | This file. App and architecture summary. | Update whenever behaviour, architecture, constants, or conventions change. |
+| `requests.md` | Log of every request, plus the Standing Decisions table. | Append a new entry for every request, including ones that changed no code. |
 | `MISC.md` | Recommendations, todos, bugs, gaps, insights. | Add new findings; mark items resolved when fixed; do not silently delete. |
+| `ascii-requests.md` | One ASCII activity diagram per request. | Append a diagram for every request, showing the path taken, decision points, and any defect found. |
+| `ascii-structure.md` | Three ASCII structure diagrams, increasing granularity. | Update level 2 when files or directories move; level 3 when the call graph or data flow changes. |
 
 **Before acting on a request that appears to clash with existing behaviour, read
 `requests.md` first.** Check the Standing Decisions table at the top of that file. If the
@@ -45,11 +47,24 @@ Open items in `MISC.md` that warrant this treatment are tagged `DECISION`.
 ## Pipeline
 
 ```
-scrape.py  →  data.json (~97 MB)  →  cleanup.py  →  data.json.gz (~17.6 MB)  →  browser
+scrape.py  →  data.json (~106 MB)  →  cleanup.py  →  data.json.gz (~19.6 MB)
+                                                          ↓
+                                                   build_pages.py
+                                                          ↓
+   public/data/artists.json (45 KB gz)  +  public/data/artist/<slug>.json (~7 KB each)
+   public/data/global.json              +  public/artist/<slug>/index.html x 2,998
+   public/sitemap.xml                   +  public/artists/index.html
 ```
 
-`data.json` is an intermediate and is **not** tracked in git. Only `data.json.gz` is
-committed. The frontend fetches the gzip directly and decompresses in-browser.
+**Nothing generated is committed** (SD-19). `data.json`, `data.json.gz` and the whole
+generated surface are build artifacts; measured at 154 MB across 6,011 files, so
+committing weekly would add ~8 GB of git history per year, and deleting the previous
+copy reclaims nothing because git keeps every blob it has ever seen.
+
+The browser never downloads the monolith. It fetches `data/artists.json` (45 KB gzipped)
+and then one artist shard (~7 KB). `data.json.gz` exists only to feed `build_pages.py`.
+
+Committed: the hand-written files in `public/`, the Python pipeline, and `slugs.json`.
 
 ## Dataset facts
 
@@ -170,25 +185,23 @@ bottom of `<body>` and calls `init()` immediately.
 
 ### Load sequence
 
-1. `allSongs = PRELOAD`, `buildArtistIndex()`, render instantly. `PRELOAD` is 10
-   hardcoded Billie Eilish tracks inlined in `app.js`, sorted by total streams.
-2. Show "Loading full dataset...".
-3. `loadDataset()`: fetch, then sniff the gzip magic number (`1f 8b`). Real gzip bytes
-   go through `DecompressionStream`; if a host set `Content-Encoding: gzip` the browser
-   already decompressed them, so they are parsed directly. Guessing wrong throws deep
-   inside `DecompressionStream` with an error that looks nothing like a config problem.
-4. `buildArtistIndex()` again over the full data, then `applyFilters()` to re-render.
+1. `buildPreloadIndex()` then render, instantly, from the 10 Billie Eilish tracks
+   inlined in `app.js`. This index build is required, not an optimisation: artist
+   lookup goes through the index.
+2. Show "Loading artists...".
+3. Fetch `data/artists.json`, 2,998 entries of `{n: name, s: slug, c: count}`.
+4. `buildArtistIndex(entries)`, honour any `?artist=<slug>` deep link, re-render.
 
-The preload exists because the 17.6 MB fetch plus decompress leaves the page blank for
-seconds. The dropdown only knows the preloaded artists until step 4 completes.
+Selecting an artist fetches `data/artist/<slug>.json` on demand and caches it in
+`shardCache`. `applyFilters()` is therefore **async**, and carries an `applyToken` so a
+slow fetch for a previous selection cannot overwrite a newer one.
 
 ### Artist selection
 
 `buildArtistIndex()` walks all 318k songs and builds
 `{ "lowercased name": { name, songs: [] } }`. Each artist's songs are stored at index
-time, so `songsForArtist(name)` is a dict hit rather than a scan. It returns a copy,
-because callers sort in place. Measured at ~60 to 110ms to index 318,431 songs, and
-effectively zero per lookup.
+time, so `songsForArtist(name)` is async: it resolves the slug from the index, fetches that
+artist's shard, and returns a copy because callers sort in place.
 
 `artistNamesFor(song)` supplies the names. It prefers `song.leads` and `song.features`
 and falls back to `parseArtistNames(song.artist)` when those are absent, which is what
@@ -362,39 +375,50 @@ wiring the filter logic back into `applyFilters()`.
 - The live version dates from **31 March 2026**.
 
 ```bash
-./deploy.sh              # stage public/ and publish
-./deploy.sh --dry-run    # stage and validate without publishing
+./deploy.sh              # build the generated surface, then publish public/
+./deploy.sh --dry-run    # build and validate without publishing
 ```
 
-`deploy.sh` copies an explicit allowlist of 11 files into `public/` and deploys that.
-It does not deploy the repo root, and this is not cosmetic:
+`deploy.sh` runs `build_pages.py` and `make_preload.py` first, because the generated
+surface is not committed (SD-19), then gates on the 25 MiB per-file cap and the 20,000
+free-plan file limit before calling `wrangler deploy`.
 
-- `wrangler.jsonc` used `assets.directory: "."`, which uploads whatever is on disk.
-  After a refresh that includes the 106 MB `data.json`, over the 25 MiB per-file cap, so
-  the deploy fails. It also published `scrape.py` and these docs.
-- `.assetsignore` was tried and **verified not to filter** on wrangler 4.118: adding it
-  increased the reported file count instead of reducing it. Do not rely on it.
-- The script hard-fails if any staged file is at or over 25 MiB.
+**A Workers Builds git integration is connected to this repo and must stay disabled**
+(SD-20). It only sees the repository, which by SD-19 contains no `data.json.gz` and no
+generated pages, so it would publish a site with no data on every push. An earlier note
+in these docs claimed no integration existed; that was inferred from every historical
+deployment reading `Source: Upload`, which was only true because the repo had been
+push-idle since March. The first push after that fired it, and it failed.
 
-`public/` is generated, gitignored, and never edited by hand.
+Two earlier traps, both verified rather than assumed:
+
+- `assets.directory: "."` uploads whatever is on disk, including the 106 MB
+  `data.json`, over the per-file cap.
+- `.assetsignore` does **not** filter on wrangler 4.118. Tested in isolation: adding it
+  increased the reported file count. Do not rely on it.
+
+Current deploy: 6,011 files, ~154 MB, largest single file 684 KB.
 
 ## Commands
 
 ```bash
-# Full data refresh (~60 min, resumable)
+# Full refresh and publish (~60 min, resumable)
 python3 scrape.py       # writes data.json
-python3 cleanup.py      # reads data.json, writes data.json.gz
-wc -c data.json.gz      # MUST be under 26,214,400 (25 MiB deploy cap)
-python3 make_preload.py # refresh the inlined PRELOAD or the load flash returns
+python3 cleanup.py      # writes data.json.gz (build intermediate, not deployed)
+./deploy.sh             # builds the generated surface, gates on limits, publishes
 
-# Frontend: a local server is REQUIRED.
-python3 -m http.server 8000    # then open http://localhost:8000
+# Frontend: a local server is REQUIRED, and it must serve public/.
+cd public && python3 -m http.server 8000
 ```
 
 ## Files
 
 - `scrape.py`: kworb scraper
 - `cleanup.py`: dedup, encoding fix, popularity, compression
+- `build_pages.py`: generates artist pages, per-artist shards, the global chart, the
+  A-Z hub and the sitemap. Owns `slugs.json`.
+- `slugs.json`: append-only artist name to URL slug registry (SD-21). Committed.
+- `deploy.sh`: build, gate, publish
 - `make_preload.py`: regenerates the inlined `PRELOAD` block from `data.json.gz`
 - `.github/workflows/refresh-data.yml`: weekly refresh, Mondays 04:10 UTC (SD-17)
 - `favicon.ico` / `icon.svg` / `apple-touch-icon.png` / `icon-192.png` / `icon-512.png`
@@ -407,3 +431,5 @@ python3 -m http.server 8000    # then open http://localhost:8000
 - `index.html` / `styles.css` / `app.js`: frontend
 - `requests.md`: request log and standing decisions
 - `MISC.md`: bugs, todos, gaps, insights
+- `ascii-requests.md`: activity diagram per request
+- `ascii-structure.md`: structure at three levels of detail

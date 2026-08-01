@@ -18,7 +18,6 @@ const SHOW_STREAM_SLIDERS = false;
 const PRELOAD = [{"title":"BIRDS OF A FEATHER","artist":"Billie Eilish","totalStreams":3882241596,"dailyStreams":2193342,"url":"https://open.spotify.com/track/6dOtVTDdiauQNBQEDOtlAB","popularity":565.0},{"title":"lovely (with Khalid)","artist":"Billie Eilish (feat. Khalid)","totalStreams":3832217282,"dailyStreams":1078676,"url":"https://open.spotify.com/track/0u2P5u6lvoDfwTYjAADbn4","popularity":281.5},{"title":"bad guy","artist":"Billie Eilish, Justin Bieber","totalStreams":2955590753,"dailyStreams":495257,"url":"https://open.spotify.com/track/2Fxmhks0bxGSBdJ92vM42m","popularity":167.6},{"title":"when the party's over","artist":"Billie Eilish","totalStreams":2536486145,"dailyStreams":544837,"url":"https://open.spotify.com/track/43zdsphuZLzwA9k4DJhU0I","popularity":214.8},{"title":"ocean eyes","artist":"Billie Eilish","totalStreams":2267307647,"dailyStreams":924187,"url":"https://open.spotify.com/track/2uIX8YMNjGMD7441kqyyNU","popularity":407.6},{"title":"WILDFLOWER","artist":"Billie Eilish","totalStreams":2185707218,"dailyStreams":1592665,"url":"https://open.spotify.com/track/3QaPy1KgI7nu9FJEQUgn6h","popularity":728.7},{"title":"everything i wanted","artist":"Billie Eilish","totalStreams":2151451091,"dailyStreams":468052,"url":"https://open.spotify.com/track/3ZCTVFBt2Brf31RLEnCkWJ","popularity":217.6},{"title":"Happier Than Ever","artist":"Billie Eilish","totalStreams":1892689610,"dailyStreams":635027,"url":"https://open.spotify.com/track/4RVwu0g32PAqgUiJoXsdF8","popularity":335.5},{"title":"What Was I Made For? [From The Motion Picture \"Barbie\"]","artist":"Billie Eilish","totalStreams":1652111685,"dailyStreams":555990,"url":"https://open.spotify.com/track/6wf7Yu7cxBSPrRlWeSeK0Q","popularity":336.5},{"title":"idontwannabeyouanymore","artist":"Billie Eilish","totalStreams":1392216167,"dailyStreams":325082,"url":"https://open.spotify.com/track/40T5GIqQ1CegGm2PTEl8Bu","popularity":233.5}];
 
 // State
-let allSongs = [];
 let artistIndex = {};  // { "artist name lowercase": { name: "Display Name", count: N } }
 let selectedArtist = DEFAULT_ARTIST;   // an artist name, or GLOBAL_KEY
 let selectedLabel = DEFAULT_ARTIST;    // what the input and results line show
@@ -52,7 +51,10 @@ function fullFormat(n) {
   return n.toLocaleString();
 }
 
-// Slider logic (disabled when SHOW_STREAM_SLIDERS = false)
+// Slider logic. DEAD CODE, kept deliberately per SD-8. SHOW_STREAM_SLIDERS is never
+// read and setting it true does nothing: the markup was removed from index.html and
+// nothing branches on the flag. Restoring sliders means restoring the markup and
+// rewiring the filter into applyFilters().
 function bucketLabel(value) {
   if (value === 0) return '0';
   return abbreviate(value) + '+';
@@ -89,20 +91,29 @@ function artistNamesFor(song) {
   return parseArtistNames(song.artist);
 }
 
-// Build artist index from all songs. Each entry holds that artist's songs, so lookups
-// are a dict hit instead of a scan over the whole dataset.
-function buildArtistIndex() {
+// Build the artist index from the small index file (~45 KB gzipped) rather than from
+// the whole dataset. Songs are fetched per artist on demand, so the browser never
+// downloads 19.6 MB to show ten rows.
+function buildArtistIndex(entries) {
   artistIndex = {};
-  for (const song of allSongs) {
+  for (const e of entries) {
+    const key = e.n.toLowerCase();
+    if (key === GLOBAL_KEY) {
+      console.warn('An artist is named ' + GLOBAL_KEY + '; the global chart key collides.');
+      continue;
+    }
+    artistIndex[key] = { name: e.n, slug: e.s, count: e.c };
+  }
+}
+
+// Index built from PRELOAD alone, so the default artist resolves during first paint.
+function buildPreloadIndex() {
+  artistIndex = {};
+  for (const song of PRELOAD) {
     for (const name of artistNamesFor(song)) {
       const key = name.toLowerCase();
-      if (!artistIndex[key]) {
-        artistIndex[key] = { name: name, songs: [] };
-      }
-      // Names for one song are processed consecutively, so checking the tail is enough
-      // to stop a song landing twice under keys that differ only by case.
-      const songs = artistIndex[key].songs;
-      if (songs[songs.length - 1] !== song) songs.push(song);
+      if (!artistIndex[key]) artistIndex[key] = { name: name, slug: null, count: 0 };
+      artistIndex[key].count++;
     }
   }
 }
@@ -127,11 +138,30 @@ function parseArtistNames(artistStr) {
   return names;
 }
 
-// Songs for the current selection. Returns a copy, since callers sort in place.
-function songsForArtist(artistName) {
-  if (artistName === GLOBAL_KEY) return allSongs.slice();
+// Songs for the current selection, fetched and cached per artist. Returns a copy,
+// since callers sort in place.
+const shardCache = new Map();
+
+async function songsForArtist(artistName) {
+  if (artistName === GLOBAL_KEY) {
+    const glob = await fetchJson('data/global.json', 'global');
+    return (glob[sortKey] || glob.totalStreams).slice();
+  }
   const entry = artistIndex[artistName.toLowerCase()];
-  return entry ? entry.songs.slice() : [];
+  if (!entry) return [];
+  // Before the index lands, PRELOAD is all we have and it has no shard.
+  if (!entry.slug) return PRELOAD.filter(s =>
+    artistNamesFor(s).some(n => n.toLowerCase() === artistName.toLowerCase()));
+  return (await fetchJson(`data/artist/${entry.slug}.json`, entry.slug)).slice();
+}
+
+async function fetchJson(url, cacheKey) {
+  if (shardCache.has(cacheKey)) return shardCache.get(cacheKey);
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`${url}: HTTP ${res.status}`);
+  const data = await res.json();
+  shardCache.set(cacheKey, data);
+  return data;
 }
 
 function isGlobal() {
@@ -143,13 +173,26 @@ function sortLabel() {
   return opt ? opt.textContent.toLowerCase() : 'total streams';
 }
 
-// Apply filters + sort on current artist's songs
-function applyFilters() {
+// Apply filters + sort on the current selection.
+let applyToken = 0;
+
+async function applyFilters() {
   const [key, dir] = sortSelect.value.split('-');
   sortKey = key;
   sortDir = dir;
 
-  filtered = songsForArtist(selectedArtist);
+  // Guard against a slow fetch for a previous selection landing after a newer one.
+  const token = ++applyToken;
+  let songs;
+  try {
+    songs = await songsForArtist(selectedArtist);
+  } catch (e) {
+    if (token !== applyToken) return;
+    resultsCount.textContent = `Could not load songs for ${selectedLabel} (${e.message}).`;
+    return;
+  }
+  if (token !== applyToken) return;
+  filtered = songs;
 
   sortFiltered();
   // Cap after sorting: the top 1,000 by total streams is a different set from the
@@ -165,6 +208,13 @@ function selectArtist(key, label) {
   selectedLabel = label || key;
   artistInput.value = selectedLabel;
   closeDropdown();
+  // Reflect the selection in the URL so artist pages can deep-link into the app and
+  // the back button works.
+  const entry = artistIndex[key.toLowerCase()];
+  const slug = key === GLOBAL_KEY ? 'global' : (entry && entry.slug);
+  if (slug && window.history && history.pushState) {
+    history.pushState({ artist: slug }, '', slug === 'global' ? '/?artist=global' : `/?artist=${slug}`);
+  }
   applyFilters();
 }
 
@@ -255,7 +305,9 @@ function render() {
     card.innerHTML = `
       <div class="song-card-top">
         <span class="song-card-rank">${start + j + 1}</span>
-        ${embedUrl ? `<div class="song-card-embed"><iframe src="${embedUrl}" height="152" frameborder="0" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="lazy"></iframe></div>` : ''}
+        ${embedUrl
+          ? `<div class="song-card-embed"><iframe src="${embedUrl}" height="152" frameborder="0" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="lazy"></iframe></div>`
+          : `<div class="song-card-meta"><div class="song-card-title">${truncate(song.title, 60)}</div><div class="song-card-artist">${truncate(song.artist, 50)}</div></div>`}
       </div>
       <div class="song-card-streams">
         <div><span>Total </span><strong>${abbreviate(song.totalStreams)}</strong></div>
@@ -389,7 +441,7 @@ artistInput.addEventListener('input', () => {
   for (const key in artistIndex) {
     if (key.includes(query)) {
       const entry = artistIndex[key];
-      matches.push({ name: entry.name, key: entry.name, count: entry.songs.length });
+      matches.push({ name: entry.name, key: entry.name, count: entry.count });
     }
   }
   // Sort: exact start match first, then by song count
@@ -409,7 +461,7 @@ artistInput.addEventListener('input', () => {
     rows.unshift({
       name: GLOBAL_LABEL,
       key: GLOBAL_KEY,
-      count: Math.min(GLOBAL_CAP, allSongs.length),
+      count: GLOBAL_CAP,
     });
   }
 
@@ -521,49 +573,58 @@ filtersToggle.addEventListener('click', (e) => {
   filtersToggle.classList.toggle('open', !open);
 });
 
-// Apply button
-document.getElementById('apply-btn').addEventListener('click', applyFilters);
+// Sort commits immediately. There was an Apply button, left over from when it also
+// committed the stream-range sliders; with only a sort left it gated a single dropdown
+// and let the results line describe a sort that had not been applied.
+sortSelect.addEventListener('change', applyFilters);
 
 // Init
 async function init() {
-  // Show preloaded data instantly. The index must be built here too, since artist
-  // lookup is now an index hit rather than a scan over allSongs.
-  allSongs = PRELOAD;
-  buildArtistIndex();
+  // Paint instantly from the inlined preload. buildPreloadIndex() is required, not an
+  // optimisation: artist lookup goes through the index.
+  buildPreloadIndex();
+  const deepLink = new URLSearchParams(location.search).get('artist');
   artistInput.value = DEFAULT_ARTIST;
-  applyFilters();
-  resultsCount.textContent = 'Loading full dataset...';
+  await applyFilters();
+  resultsCount.textContent = 'Loading artists...';
 
-  // Load full dataset in background
+  let entries;
   try {
-    allSongs = await loadDataset();
-    buildArtistIndex();
-    applyFilters();
+    entries = await fetchJson('data/artists.json', '__index__');
   } catch (e) {
     // fetch() is blocked on file:// by every modern browser (the origin is opaque),
-    // so opening index.html straight off disk can only ever show PRELOAD. Say that
-    // plainly instead of a generic failure the user cannot act on.
+    // so opening index.html straight off disk can only ever show PRELOAD.
     resultsCount.textContent = location.protocol === 'file:'
-      ? `Sample data only (${allSongs.length} songs). Browsers block file access, so the full dataset needs a local server: run "python3 -m http.server" in this folder, then open http://localhost:8000`
-      : `Failed to load full dataset (${e.message}). Showing ${allSongs.length} sample songs.`;
-  }
-}
-
-async function loadDataset() {
-  const res = await fetch('data.json.gz');
-  if (!res.ok) throw new Error('HTTP ' + res.status);
-  const bytes = new Uint8Array(await res.arrayBuffer());
-
-  // Some hosts serve .gz with Content-Encoding: gzip, in which case the browser has
-  // already decompressed it and these bytes are plain JSON. Sniff the gzip magic
-  // number rather than assuming: guessing wrong throws deep inside DecompressionStream
-  // with an error that looks nothing like a config problem.
-  if (bytes[0] !== 0x1f || bytes[1] !== 0x8b) {
-    return JSON.parse(new TextDecoder().decode(bytes));
+      ? `Sample data only (${PRELOAD.length} songs). Browsers block file access, so the full dataset needs a local server: run "python3 -m http.server" in the public folder, then open http://localhost:8000`
+      : `Failed to load the artist index (${e.message}). Showing ${PRELOAD.length} sample songs.`;
+    return;
   }
 
-  const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));
-  return JSON.parse(await new Response(stream).text());
+  buildArtistIndex(entries);
+
+  // Deep link from a generated artist page, e.g. /?artist=tyler-the-creator
+  if (deepLink) {
+    const hit = deepLink === 'global'
+      ? { name: GLOBAL_LABEL, key: GLOBAL_KEY }
+      : entries.find(e => e.s === deepLink);
+    if (hit) {
+      selectedArtist = deepLink === 'global' ? GLOBAL_KEY : hit.n;
+      selectedLabel = deepLink === 'global' ? GLOBAL_LABEL : hit.n;
+      artistInput.value = selectedLabel;
+    }
+  }
+
+  await applyFilters();
 }
+
+window.addEventListener('popstate', () => {
+  const slug = new URLSearchParams(location.search).get('artist');
+  const entry = slug && Object.values(artistIndex).find(e => e.slug === slug);
+  if (slug === 'global') { selectedArtist = GLOBAL_KEY; selectedLabel = GLOBAL_LABEL; }
+  else if (entry) { selectedArtist = entry.name; selectedLabel = entry.name; }
+  else { selectedArtist = DEFAULT_ARTIST; selectedLabel = DEFAULT_ARTIST; }
+  artistInput.value = selectedLabel;
+  applyFilters();
+});
 
 init();

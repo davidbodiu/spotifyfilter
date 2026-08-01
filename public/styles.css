@@ -205,8 +205,7 @@ body {
 }
 
 #artist-input:focus-visible,
-#sort-select:focus-visible,
-#apply-btn:focus-visible {
+#sort-select:focus-visible {
   outline: 2px solid var(--accent-text);
   outline-offset: 2px;
 }
@@ -651,6 +650,23 @@ tr {
   align-self: center;
 }
 
+.song-card-meta {
+  flex: 1;
+  min-width: 0;
+}
+
+.song-card-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.song-card-artist {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
 .song-card-embed {
   flex: 1;
   min-width: 0;
@@ -718,4 +734,42 @@ tr {
   .mobile-cards {
     display: block;
   }
+}
+
+/* Generated artist pages (build_pages.py). Same tokens as the app. */
+.crumbs {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-bottom: 20px;
+}
+
+.crumbs a,
+.az a,
+.page-lede a {
+  color: var(--accent-text);
+}
+
+.page-title {
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -0.3px;
+  margin-bottom: 8px;
+}
+
+.page-lede {
+  color: var(--text-muted);
+  font-size: 15px;
+  margin-bottom: 20px;
+  line-height: 1.6;
+}
+
+.az {
+  line-height: 2.1;
+  margin-bottom: 18px;
+  font-size: 14px;
+}
+
+.az a {
+  margin-right: 14px;
+  white-space: nowrap;
 }

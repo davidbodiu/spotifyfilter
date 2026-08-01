@@ -13,11 +13,10 @@
     "enabled": true
   },
   "assets": {
-    // public/ is a staging directory populated by deploy.sh, NOT source. It was "."
-    // (the repo root), which uploads whatever happens to be on disk: after a refresh
-    // that includes the 106 MB data.json, over the 25 MiB per-file cap. .assetsignore
-    // was tested against wrangler 4.118 and does not filter, so the allowlist in
-    // deploy.sh is the mechanism.
+    // public/ IS the committed site, not a build artifact. Pointing this at "." used
+    // to upload the whole repo root (including the 106 MB data.json, over the 25 MiB
+    // per-file cap); pointing it at an uncommitted staging dir broke the Workers
+    // Builds git integration, which checks out the repo and finds nothing there.
     "directory": "./public"
   }
 }

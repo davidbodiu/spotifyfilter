@@ -28,7 +28,7 @@ silently.
 | SD-8 | Stream range sliders are hidden but their code stays in the tree. | R7.2 | Removal was explicitly scoped to the UI, not the logic. |
 | SD-9 | Sort options are descending only. | R3.3 | Six options was clutter. |
 | SD-10 | Default artist is Billie Eilish and must match `PRELOAD`. | R6.5 | Empty state would otherwise render nothing. |
-| SD-11 | `CLAUDE.md`, `requests.md`, and `MISC.md` are updated after every request. | R10 | Explicit instruction, 31 July 2026. |
+| SD-11 | `CLAUDE.md`, `requests.md`, `MISC.md`, `ascii-requests.md` and `ascii-structure.md` are updated after every request. | R10, extended R20 | Explicit instruction, 31 July 2026; two ASCII views added 1 August. |
 | SD-12 | Significant technical decisions are presented as 2 to 4 compared options; the user chooses and reasons before any recommendation. | R11 | The user is using this project as a learning channel. |
 | SD-13 | Artist names travel as structured `leads` / `features` arrays, never as a parsed display string. | R12 | Joining on `", "` is lossy for names containing commas. Chosen for robustness. |
 | SD-14 | **Amends SD-6.** A capped Global chart (top 1,000 by the selected sort) exists alongside artist selection. Free-text song search stays removed. | R16 | Artist-first remains the product; an uncapped 318k list is not. |
@@ -36,6 +36,10 @@ silently.
 | SD-16 | `#1DB954` is a FILL only, never text. `--accent-text` carries the readable green. | R16 | The brand green is 2.50:1 on white, failing WCAG AA for text. |
 | SD-17 | Spotify's wordmark is not used. Weekly refresh runs on GitHub Actions, not Cloudflare compute. | R16 | Trademark exposure; no CF product can hold a 40 to 75 minute job. |
 | SD-18 | The `artistNamesFor()` legacy fallback is permanent, not transitional. | R16 | Archived snapshots predate `leads`/`features` and are the time-series anchor. |
+| SD-19 | The generated surface (artist pages, shards, sitemap) and `data.json.gz` are **never committed**. Every deploy builds them first. | R19 | Measured 154 MB per build; committing weekly is ~8 GB/year and git never reclaims deleted blobs. |
+| SD-20 | The Cloudflare **Workers Builds git integration must stay disabled**. Deploys come from `deploy.sh` or CI. | R19 | It only sees the repo, which by SD-19 has no data. It would publish a broken site on every push. |
+| SD-21 | `slugs.json` is append-only. A name's slug is never reassigned. | R19 | A changed slug destroys its own URL, backlinks and rankings. |
+| SD-22 | Spotify embeds are left exactly as they are, dark in both themes. | R19 | Verified: no light embed exists. User chose to leave it. |
 
 ---
 
@@ -402,3 +406,127 @@ falls back to rendering features as leads. That is the documented edge case in
 visited.
 
 No code changed.
+
+**R15. Eight-part request: light mode with device precedence, remove the Spotify logo,
+remove all em dashes, no favicon and near-zero SEO, weekly self-update on Cloudflare and
+its cost, monetisation, "All" as an artist plus last week/month/year filters, and a load
+flash.**
+
+Scouted locally, then fanned out 11 agents (6 research, 4 adversarial verify, 1
+synthesis) over Cloudflare cost, SEO, monetisation, kworb time-window availability, the
+flash, and theming. Verifiers overturned 15 claims from the researchers.
+
+Flagged two clashes before acting: "All" contradicts SD-6 (artist-first, no global
+song list), and time-window filters are blocked on data that does not exist, since the
+schema holds only lifetime and single-day figures.
+
+Key findings: the only indexable URL is the homepage, which caps SEO arithmetically;
+`#1DB954` is 2.50:1 on white and fails AA for text; no Cloudflare compute product can
+hold a 40 to 75 minute job; Spotify's terms forbid reselling this data.
+
+Fixed while the research ran: all em dashes removed from source, and B-2 (ampersands
+double-escaping in the results header).
+
+Decisions D1 to D8 were framed with options and no recommendation, per SD-12.
+
+**R16. "D1. c / D5. a / D7. a"**
+
+Implemented the three choices plus the outstanding light-mode and favicon work.
+Global chart capped at 1,000 with the cap applied AFTER sorting, verified as 0/1000
+overlap between sort orders (SD-14). Spotify wordmark replaced with a three-bar mark and
+a full favicon set (SD-17). GitHub Actions weekly refresh with a 25 MiB size gate and an
+SD-13 invariant check. Light theme via semantic tokens (SD-15), with the accent split
+into fill and text variants (SD-16). Established SD-18: the `artistNamesFor()` legacy
+fallback is permanent, because archived snapshots predate `leads`/`features`.
+
+Verification checked that every CSS variable was defined and that no hardcoded colours
+remained. Both passed. **Neither can detect a defined-but-wrong token**, and the release
+shipped with `body { background }` resolving to `#0a0a0a` in both themes.
+
+**R17. "why does index only have 10 songs when i open up, also light theme is still
+mostly dark... these are pretty basic things you seem to have messed up on"**
+
+Both reports correct. The light theme was mine: a scripted find/replace mapped
+`var(--black)` to `--on-accent` globally, right for the three "text on a green fill"
+uses and wrong for the page background. Auditing every substitution against
+`git show HEAD:styles.css` found three more regressions.
+
+The 10 songs were not a regression: browsers treat `file://` as an opaque origin and
+block `fetch()`, so opening `index.html` from disk has never loaded the dataset.
+`CLAUDE.md` claimed "no server needed"; I carried that into the rewrite untested and
+handed it to six agents in R15 as a hard constraint.
+
+Ran an adversarial hunt (5 lenses, 20 agents), 13 confirmed findings. Two were serious:
+the render signature guard **never fired**, because `totalResults` changes 10 to 78
+across the transition it guards, and `escapeHtml()` never escaped quotes, breaking the
+`title` attribute on 2,197 rows including the default first page. Also fixed the light
+elevation ladder and a focus ring that made controls less visible than at rest.
+
+**R18. "spotify cards/previews are still dark in light mode. also how do i deploy to
+cloudflare to update?" then "sure deploy"**
+
+Verified directly that all three Spotify embed variants ship `encore-dark-theme`: there
+is no light embed, and the iframe is cross-origin so its interior cannot be styled.
+
+Identified the deploy target with `wrangler deployments list`: a Worker named
+`spotifyfilter`, not Pages, last published 31 March. Every deployment read
+`Source: Upload`, from which I concluded no git integration existed. **That was an
+inference from a repo idle since March, not a verified fact, and R19 proved it wrong.**
+
+Fixed two hard blockers: `main` had no `wrangler.jsonc`, and `assets.directory: "."`
+would have uploaded the 106 MB `data.json`. `.assetsignore` was tested in isolation and
+does not filter on wrangler 4.118.
+
+Deployed `edd0ef82`, first publish since 31 March. The initial verification read
+`cf-cache-status: HIT` and showed the old build; cache-busting was needed.
+
+**R19. Workers Builds failure screenshot, plus G-8 leave as is, R-5 can we not delete
+the old data, R-3 let's split, D4 what is the decision, and implement everything else.**
+
+The build failure was mine twice over. A Workers Builds git integration does exist; it
+had simply never fired on an idle repo. It failed in 0s because I had pointed
+`assets.directory` at `./public` and then gitignored `public/`.
+
+R-5: the premise does not hold. Deleting a file in a later commit reclaims nothing,
+because git keeps every blob ever committed. Measured the generated tree at 154 MB
+across 6,011 files, so committing weekly is roughly 8 GB of history per year. Resolved
+as SD-19 (nothing generated is committed) and SD-20 (the git integration stays
+disabled).
+
+R-3: built `build_pages.py`, generating 2,998 artist pages with real crawlable text and
+JSON-LD, per-artist JSON shards, a global chart file, an A-Z hub and a 3,000-URL
+sitemap, on an append-only slug registry (SD-21). Rewrote the frontend data layer to
+fetch a 45 KB index plus one ~7 KB shard, so the 19.6 MB monolith is no longer
+downloaded at all.
+
+D4 explained rather than decided. G-8 recorded as SD-22, embeds left alone.
+
+Also shipped: og-image with `summary_large_image`, sort-on-change replacing the
+redundant Apply button, mobile card titles, corrected empty-state copy, an explicit
+unsupported-browser message, form labels, opaque maskable icons, and a narrower
+`init()` try block.
+
+Deployed `2d4c83e4`: 6,011 files, and the old monolith now 404s.
+
+**R20. "Create log of all requests, a comprehensive app/architecture summary (CLAUDE.md),
+and a misc file. Requests log should be read when a new request clashes. Create an
+ascii-requests.md with an ASCII implementation activity diagram per request. Create 3
+ASCII project structure diagrams of increasing granularity. Update all after each
+request."**
+
+The first three already existed from R10 and were verified current rather than rebuilt:
+`CLAUDE.md` 435 lines, `MISC.md` 569, 22 standing decisions, 37 tracked items.
+
+Added `ascii-requests.md` (one activity diagram per request; March grouped by session
+since those are reconstructed, R8 onward individually) and `ascii-structure.md` (three
+levels: four boxes, directories and jobs, then call graph and data flow).
+
+**Found and repaired a real gap in this file.** `requests.md` ended at R14: the R15
+append had anchored on text that did not exist and silently no-opped, which broke the
+anchor for R16, and so on through R19. The Standing Decisions table meanwhile cited R16
+and R19, because those edits anchored on real table rows and did succeed. Entries R15 to
+R19 above were reconstructed from this session. The cause is the same failure mode
+recorded in R17: an edit that was never asserted to have applied. Every documentation
+write in this request asserts its anchor first.
+
+Protocol extended from three files to five; SD-11 updated.

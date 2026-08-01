@@ -12,11 +12,16 @@
   <meta property="og:url" content="https://chartrank.app">
   <meta property="og:title" content="ChartRank: See Every Song by Any Artist, Ranked by Spotify Streams">
   <meta property="og:description" content="Go beyond the top 10. See every song by any artist ranked by total streams, daily plays, or popularity. Full streaming data for 3,000+ artists.">
+  <meta property="og:image" content="https://chartrank.app/og-image.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="ChartRank: every song by any artist, ranked by Spotify streams.">
 
   <!-- Twitter -->
-  <meta name="twitter:card" content="summary">
+  <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="ChartRank: See Every Song by Any Artist, Ranked by Spotify Streams">
   <meta name="twitter:description" content="Go beyond the top 10. See every song by any artist ranked by total streams, daily plays, or popularity. Full streaming data for 3,000+ artists.">
+  <meta name="twitter:image" content="https://chartrank.app/og-image.png">
 
   <meta name="color-scheme" content="light dark">
   <meta name="theme-color" content="#fbfbfc" media="(prefers-color-scheme: light)">
@@ -38,6 +43,7 @@
         if (t === 'light' || t === 'dark') {
           document.documentElement.setAttribute('data-theme', t);
         }
+        document.documentElement.dataset.themeChoice = (t === 'light' || t === 'dark') ? t : 'system';
       } catch (e) {}
     })();
   </script>
@@ -60,14 +66,14 @@
 
       <button id="theme-toggle" class="theme-toggle" type="button"
               aria-label="Colour theme: follow device">
-        <span id="theme-toggle-icon" aria-hidden="true">A</span>
-        <span id="theme-toggle-label">System</span>
+        <span id="theme-toggle-icon" aria-hidden="true"></span>
+        <span id="theme-toggle-label"></span>
       </button>
     </header>
 
     <section class="filters">
       <div class="filter-group">
-        <label>Search Artist</label>
+        <label for="artist-input">Search Artist</label>
         <div class="artist-search-wrapper">
           <input type="text" id="artist-input" placeholder="e.g. Billie Eilish, Drake..." autocomplete="off">
           <div id="artist-dropdown" class="artist-dropdown"></div>
@@ -77,17 +83,12 @@
       <a href="#" id="filters-toggle" class="filters-toggle">Filters <span class="toggle-arrow">&#9662;</span></a>
       <div class="filter-row" id="filter-row" style="display:none;">
         <div class="filter-group filter-group-inline">
-          <label>Sort by</label>
+          <label for="sort-select">Sort by</label>
           <select id="sort-select">
             <option value="totalStreams-desc" selected>Total Streams</option>
             <option value="dailyStreams-desc">Daily Streams</option>
             <option value="popularity-desc">Popularity (Daily/Total)</option>
           </select>
-        </div>
-
-        <div class="filter-group filter-group-inline filter-apply-wrapper">
-          <label>&nbsp;</label>
-          <button id="apply-btn">Apply</button>
         </div>
       </div>
     </section>
@@ -112,7 +113,7 @@
         </table>
       </div>
       <div class="mobile-cards" id="mobile-cards"></div>
-      <div id="no-results" class="no-results" style="display:none;">No songs match your filters</div>
+      <div id="no-results" class="no-results" style="display:none;">No songs found for this artist</div>
       <div class="pagination" id="pagination"></div>
     </section>
   </div>

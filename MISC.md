@@ -7,7 +7,8 @@ Status values: `OPEN`, `IN PROGRESS`, `FIXED`, `WONTFIX`, `UNVERIFIED`.
 Items are not deleted when resolved, only marked.
 
 `R<n>` and `SD-<n>` references point at `requests.md`: request entries and standing
-decisions respectively. `B-`, `G-`, `R-`, `T-`, and `I-` references are local to this
+decisions respectively. `ascii-requests.md` diagrams the same `R<n>` entries;
+`ascii-structure.md` shows where each `SD-<n>` is actually enforced. `B-`, `G-`, `R-`, `T-`, and `I-` references are local to this
 file.
 
 Items tagged `DECISION` involve a real trade-off and must be presented as compared
@@ -15,6 +16,7 @@ alternatives before being acted on, per SD-12. Untagged items are one-way fixes 
 meaningful alternative; just do them.
 
 Last full audit: 31 July 2026 (R10). Research sweep 31 July 2026 (R15).
+Regression hunt 31 July 2026 (R17). Structure documented 1 August 2026 (R20).
 
 ---
 
@@ -378,7 +380,7 @@ visibly jump when the real data lands.
 Either add a `cleanup.py` step that regenerates the `PRELOAD` block, or drop stream
 figures from the preload render so there is nothing to be wrong.
 
-### R-3. Consider per-artist data files `OPEN` `ARCHITECTURAL` `DECISION`
+### R-3. Per-artist data files `DONE`
 
 The app loads 17.6 MB to display 10 rows for one artist. Splitting into
 `data/<artist>.json` plus a small artist index file would cut the initial load to a few
@@ -408,13 +410,25 @@ searchable under "Macklemore". That divergence is intentional. Confirmed by test
 two-record merge yields `artist='Macklemore & Ryan Lewis'` with
 `leads=['Macklemore & Ryan Lewis', 'Macklemore']`.
 
-### R-5. `data.json.gz` in git will bloat the repo on every refresh `OPEN` `DECISION`
+### R-5. `data.json.gz` in git will bloat the repo on every refresh `RESOLVED`
 
 Each regeneration commits a fresh 17.6 MB binary that does not delta-compress. Three
 refreshes and the repo is over 70 MB of history for a 40 KB app.
 
 Consider Git LFS, or keeping the data out of git and publishing it as a release asset or
 deploy-time artifact.
+
+**Resolved 1 August 2026 (R19).** The user asked whether the old data could simply be
+deleted when new data is uploaded. It cannot help: git keeps every blob ever committed,
+so deleting a file in a later commit reclaims nothing without rewriting history.
+
+Measured instead: the generated surface is **154 MB across 6,011 files** per build.
+Committing that weekly is roughly **8 GB of git history per year**. Resolution is SD-19:
+nothing generated is committed, and `deploy.sh` rebuilds it before every publish. The
+repo now holds only source, the Python pipeline and `slugs.json`.
+
+Consequence, recorded as SD-20: the Workers Builds git integration cannot publish this
+site and must stay disabled.
 
 ---
 
@@ -478,7 +492,7 @@ Two findings worth keeping: `assets.directory: "."` would upload the 106 MB `dat
 and blow the 25 MiB cap, and `.assetsignore` does **not** filter on wrangler 4.118,
 verified with an isolated test where adding it increased the file count.
 
-### G-8. Spotify embeds are dark-only, and there are two per row `OPEN` `DECISION`
+### G-8. Spotify embeds are dark-only, and there are two per row `WONTFIX` (embed) / `OPEN` (double build)
 
 The user reports the preview cards stay dark in light mode. Verified directly against
 `open.spotify.com/embed/track/...`: all three variants (`theme=0`, no theme, `theme=1`)
@@ -492,7 +506,11 @@ embeds constructed per page to show 10.
 
 Both point at the same fix: replace the always-on iframe with a lightweight row that
 loads the embed on click. That would resolve the light-mode appearance and halve or
-better the embed cost. Tagged `DECISION` because it changes the interaction model.
+better the embed cost.
+
+**Decided R19: leave the embeds as they are** (SD-22). The dark appearance in light mode
+is accepted. The double-build remains open as a performance item, since it is
+independent of the visual question.
 
 ---
 

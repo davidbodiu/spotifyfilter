@@ -17,7 +17,7 @@ import json
 import re
 import sys
 
-APP_FILE = "app.js"
+APP_FILE = "public/app.js"
 DATA_FILE = "data.json.gz"
 
 

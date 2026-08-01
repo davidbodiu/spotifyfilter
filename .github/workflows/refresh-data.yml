@@ -11,11 +11,15 @@ name: Weekly data refresh
 # The commit is not incidental: public-repo scheduled workflows are auto-disabled after
 # 60 days with no repository activity, so the push is what keeps this job alive.
 #
-# The commit does NOT publish anything. Verified with
-# `wrangler deployments list --name spotifyfilter`: every deployment is Source "Upload",
-# so the site is a manually deployed Worker with no git integration. Publishing needs
-# the explicit deploy step below, which requires a CLOUDFLARE_API_TOKEN secret with the
-# "Edit Cloudflare Workers" permission.
+# The commit does NOT publish anything, and it must not. A Cloudflare Workers Builds
+# git integration IS connected to this repo (an earlier note here claimed otherwise,
+# based on every historical deployment reading Source "Upload"; that was only because
+# the repo had been idle since March, so the integration had never fired). It cannot
+# publish this site: it only sees the repo, and the generated surface plus data.json.gz
+# are deliberately not committed. Leave it disabled in the Cloudflare dashboard.
+#
+# Publishing happens in the deploy step below, which needs a CLOUDFLARE_API_TOKEN
+# secret with the "Edit Cloudflare Workers" permission.
 
 on:
   schedule:
@@ -106,6 +110,11 @@ jobs:
           print("shape and SD-13 invariants OK")
           EOF
 
+      - name: Build the generated surface
+        # Artist pages, per-artist shards, global chart and sitemap. Not committed
+        # (~154 MB), so this must run before every deploy.
+        run: python3 build_pages.py
+
       - name: Regenerate the inlined PRELOAD
         # Without this the first-paint rows no longer match the shipped data, the
         # render signature guard stops matching, and the load flash silently returns.
@@ -115,7 +124,7 @@ jobs:
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data.json.gz app.js
+          git add public/app.js slugs.json
           if git diff --staged --quiet; then
             echo "Nothing changed; skipping commit."
           else

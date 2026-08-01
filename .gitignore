@@ -2,10 +2,22 @@
 data.json
 scrape_progress.json
 
-# Snapshot archive. These are ~20 MB each and their durable home is still undecided
-# (MISC D2/D3), so they are deliberately not committed. NOTE: that means the copies
-# in snapshots/ currently exist ONLY on local disk.
+# Snapshot archive. ~20 MB each; durable home still undecided (R-5). NOTE: these
+# currently exist ONLY on local disk.
 snapshots/
+
+# public/ is the deployed site. Its hand-written files are committed; everything
+# build_pages.py generates is not. Measured 1 Aug 2026: the generated tree is 154 MB
+# across 6,011 files. Committing that weekly would add ~8 GB of git history per year,
+# and deleting the old copy each time reclaims nothing, because git keeps every blob
+# that was ever committed. So it is regenerated on every deploy instead.
+public/artist/
+public/artists/
+public/data/
+public/sitemap.xml
+
+# Build intermediate. cleanup.py writes it, build_pages.py consumes it. Never deployed.
+data.json.gz
 
 # Python
 __pycache__/
@@ -13,7 +25,6 @@ __pycache__/
 
 # macOS
 .DS_Store
-public/
 
 # wrangler local state
 .wrangler/

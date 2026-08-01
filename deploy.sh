@@ -1,36 +1,36 @@
 #!/usr/bin/env bash
-# Stage the site into public/ and deploy that directory to Cloudflare.
+# Build the generated surface, then deploy public/ to the Cloudflare Worker.
 #
-# Why staging rather than deploying the repo root: wrangler's assets.directory used to
-# be ".", which uploads EVERYTHING present on disk. That is now dangerous, because a
-# refresh leaves a 106 MB data.json and a snapshots/ archive in the root. data.json
-# alone is over the 25 MiB per-file cap, so the deploy would fail. .assetsignore was
-# tried and verified NOT to filter in wrangler 4.118, so an explicit allowlist it is.
+# The generated tree (artist pages, per-artist shards, sitemap) is ~154 MB and is NOT
+# committed, so it must be built before every deploy. That also means the Cloudflare
+# Workers Builds git integration cannot publish this site: it only sees the repo, which
+# has no generated output and no data.json.gz. Deploy from here or from CI.
 set -euo pipefail
 cd "$(dirname "$0")"
 
-SITE=(index.html app.js styles.css data.json.gz
-      favicon.ico icon.svg apple-touch-icon.png icon-192.png icon-512.png
-      manifest.webmanifest robots.txt)
-
 CAP=26214400   # 25 MiB, Cloudflare's per-file asset limit
 
-rm -rf public && mkdir public
-for f in "${SITE[@]}"; do
-  [ -f "$f" ] || { echo "ERROR: missing $f" >&2; exit 1; }
-  SIZE=$(wc -c < "$f")
-  if [ "$SIZE" -ge "$CAP" ]; then
-    echo "ERROR: $f is $SIZE bytes, at or over the ${CAP}-byte per-file cap." >&2
-    exit 1
-  fi
-  cp "$f" public/
-done
+[ -f data.json.gz ] || {
+  echo "ERROR: data.json.gz missing. Run: python3 scrape.py && python3 cleanup.py" >&2
+  exit 1
+}
 
-echo "Staged $(ls public | wc -l | tr -d ' ') files, $(du -sh public | cut -f1) total:"
-ls -la public | tail -n +2
+echo "Building generated pages..."
+python3 build_pages.py
+python3 make_preload.py
 
-if [ "${1:-}" = "--dry-run" ]; then
-  npx wrangler deploy --dry-run
-else
-  npx wrangler deploy
+OVERSIZE=$(find public -type f -size +${CAP}c)
+if [ -n "$OVERSIZE" ]; then
+  echo "ERROR: over the ${CAP}-byte per-file cap:" >&2
+  echo "$OVERSIZE" | while read -r f; do echo "  $(wc -c < "$f") $f" >&2; done
+  exit 1
 fi
+
+COUNT=$(find public -type f | wc -l | tr -d ' ')
+if [ "$COUNT" -ge 20000 ]; then
+  echo "ERROR: $COUNT files, at or over the 20,000 free-plan asset limit." >&2
+  exit 1
+fi
+
+echo "Deploying $COUNT files, $(du -sh public | cut -f1):"
+npx wrangler deploy ${1:+"$1"}
