@@ -2,7 +2,13 @@
 const TOTAL_BUCKETS = [0, 10000, 50000, 100000, 500000, 1000000, 2000000, 5000000, 10000000, 50000000, 100000000, 500000000, 1000000000, 2000000000, 5000000000];
 const DAILY_BUCKETS = [0, 1000, 5000, 10000, 50000, 100000, 500000, 1000000, 5000000];
 
-const PAGE_SIZE = 10;
+// Raised from 10 to 50 on request (R23). SD-3 originally pinned this at 10 because
+// Spotify embeds stopped playing after a few page changes. That fix had two halves and
+// the other half stands: iframe src is still blanked before removal. To buy headroom
+// for the larger page, render() now builds ONLY the layout that is actually visible,
+// so a page costs 50 iframes rather than the 100 it would have at the old
+// build-both-layouts behaviour.
+const PAGE_SIZE = 50;
 const DEFAULT_ARTIST = 'Billie Eilish';
 
 // Global chart. SD-6 keeps the app artist-first, so this is deliberately not an
@@ -27,6 +33,11 @@ let sortKey = 'totalStreams';
 let sortDir = 'desc';
 let highlightedIdx = -1;
 let lastRenderSignature = null;
+
+// CSS shows the table above 768px and the cards below it. render() used to build both
+// and let CSS hide one, so half of every page's Spotify embeds were constructed into a
+// container nobody could see. Track the breakpoint and build one.
+const mobileQuery = window.matchMedia('(max-width: 768px)');
 
 // DOM refs
 const artistInput = document.getElementById('artist-input');
@@ -269,6 +280,7 @@ function render() {
   // when those are unchanged is what removes the load flash, and it keeps playing
   // embeds alive because nothing detaches them.
   const rowSignature = selectedArtist + '|' + sortKey + '|' + sortDir + '|' + start + '|' +
+    (mobileQuery.matches ? 'm|' : 'd|') +
     page.map(s => s.url + ':' + s.totalStreams + ':' + s.dailyStreams).join(',');
   if (rowSignature === lastRenderSignature) return;
   lastRenderSignature = rowSignature;
@@ -280,9 +292,9 @@ function render() {
   mobileCards.querySelectorAll('iframe').forEach(f => { f.src = ''; f.remove(); });
   if (totalResults === 0) mobileCards.innerHTML = '';
 
-  // Table rows
+  // Table rows (desktop layout only)
   resultsBody.innerHTML = '';
-  page.forEach((song, i) => {
+  if (!mobileQuery.matches) page.forEach((song, i) => {
     const tr = document.createElement('tr');
     const embedUrl = song.url ? song.url.replace('open.spotify.com/track/', 'open.spotify.com/embed/track/') + '?utm_source=generator&theme=0' : '';
     tr.innerHTML = `
@@ -296,9 +308,9 @@ function render() {
     resultsBody.appendChild(tr);
   });
 
-  // Mobile cards
+  // Mobile cards (mobile layout only)
   mobileCards.innerHTML = '';
-  page.forEach((song, j) => {
+  if (mobileQuery.matches) page.forEach((song, j) => {
     const embedUrl = song.url ? song.url.replace('open.spotify.com/track/', 'open.spotify.com/embed/track/') + '?utm_source=generator&theme=0' : '';
     const card = document.createElement('div');
     card.className = 'song-card';
@@ -571,6 +583,13 @@ filtersToggle.addEventListener('click', (e) => {
   const open = filterRow.style.display !== 'none';
   filterRow.style.display = open ? 'none' : '';
   filtersToggle.classList.toggle('open', !open);
+});
+
+// Crossing the breakpoint swaps which layout CSS shows, and that layout was never
+// built. Force a rebuild rather than leaving an empty container.
+mobileQuery.addEventListener('change', () => {
+  lastRenderSignature = null;
+  render();
 });
 
 // Sort commits immediately. There was an Apply button, left over from when it also
