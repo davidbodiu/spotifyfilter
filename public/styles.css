@@ -773,3 +773,105 @@ tr {
   margin-right: 14px;
   white-space: nowrap;
 }
+
+/* Artist search row: input plus the random-artist button */
+.artist-search-row {
+  display: flex;
+  gap: 10px;
+  align-items: stretch;
+}
+
+.artist-search-row .artist-search-wrapper {
+  flex: 1;
+  min-width: 0;
+}
+
+.random-btn {
+  flex-shrink: 0;
+  padding: 10px 18px;
+  border-radius: 8px;
+  border: 1px solid var(--border-control);
+  background: var(--surface-2);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: border-color 0.2s, background 0.2s;
+}
+
+.random-btn:hover {
+  border-color: var(--accent);
+  background: var(--hover);
+}
+
+.random-btn:focus-visible {
+  outline: 2px solid var(--accent-text);
+  outline-offset: 2px;
+}
+
+/* Footer */
+.footer {
+  margin-top: 40px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.footer a {
+  color: var(--accent-text);
+}
+
+
+@media (max-width: 768px) {
+  .random-btn {
+    padding: 10px 12px;
+  }
+}
+
+/* Related artists */
+.related {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.related-label {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--text-muted);
+  margin-right: 2px;
+}
+
+.related-chip {
+  padding: 5px 12px;
+  border-radius: 16px;
+  border: 1px solid var(--border-control);
+  background: var(--surface-2);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: border-color 0.2s, background 0.2s;
+}
+
+.related-chip:hover {
+  border-color: var(--accent);
+  background: var(--hover);
+}
+
+.related-chip:focus-visible {
+  outline: 2px solid var(--accent-text);
+  outline-offset: 2px;
+}

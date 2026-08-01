@@ -2,13 +2,23 @@
 const TOTAL_BUCKETS = [0, 10000, 50000, 100000, 500000, 1000000, 2000000, 5000000, 10000000, 50000000, 100000000, 500000000, 1000000000, 2000000000, 5000000000];
 const DAILY_BUCKETS = [0, 1000, 5000, 10000, 50000, 100000, 500000, 1000000, 5000000];
 
-// Raised from 10 to 50 on request (R23). SD-3 originally pinned this at 10 because
-// Spotify embeds stopped playing after a few page changes. That fix had two halves and
-// the other half stands: iframe src is still blanked before removal. To buy headroom
-// for the larger page, render() now builds ONLY the layout that is actually visible,
-// so a page costs 50 iframes rather than the 100 it would have at the old
-// build-both-layouts behaviour.
-const PAGE_SIZE = 50;
+// Page size is per-device, because the cost is one Spotify embed per row and a phone
+// has orders of magnitude less memory for them than a desktop.
+//
+// SD-3 pinned this at 10 in March after embeds stopped playing at 40 constructed
+// iframes. Raised to 50 in R23; the field test failed on mobile (R25): scrolling to the
+// bottom loaded all 50 lazy embeds at once, exhausted the tab and made the browser
+// discard and reload it. Desktop was unaffected. Both are now below the 40 that broke
+// in March. The split is kept so mobile can be lowered further without touching desktop
+// if phones still struggle at 30.
+//
+// The other half of SD-3 is untouched: iframe src is still blanked before removal.
+const PAGE_SIZE_DESKTOP = 30;
+const PAGE_SIZE_MOBILE = 30;
+
+function pageSize() {
+  return mobileQuery.matches ? PAGE_SIZE_MOBILE : PAGE_SIZE_DESKTOP;
+}
 const DEFAULT_ARTIST = 'Billie Eilish';
 
 // Global chart. SD-6 keeps the app artist-first, so this is deliberately not an
@@ -18,10 +28,15 @@ const DEFAULT_ARTIST = 'Billie Eilish';
 const GLOBAL_KEY = '__global__';
 const GLOBAL_LABEL = 'Global chart (all artists)';
 const GLOBAL_CAP = 1000;
+
+// Related artists. Derived from the artist's own shard, which already contains exactly
+// the songs they appear on, so it needs no extra file and no extra request. Verified
+// to match build_pages.py's whole-dataset co-occurrence byte for byte.
+const RELATED_CAP = 12;
 const SHOW_STREAM_SLIDERS = false;
 
 // Billie Eilish preload for instant display (sorted by total streams)
-const PRELOAD = [{"title":"BIRDS OF A FEATHER","artist":"Billie Eilish","totalStreams":3882241596,"dailyStreams":2193342,"url":"https://open.spotify.com/track/6dOtVTDdiauQNBQEDOtlAB","popularity":565.0},{"title":"lovely (with Khalid)","artist":"Billie Eilish (feat. Khalid)","totalStreams":3832217282,"dailyStreams":1078676,"url":"https://open.spotify.com/track/0u2P5u6lvoDfwTYjAADbn4","popularity":281.5},{"title":"bad guy","artist":"Billie Eilish, Justin Bieber","totalStreams":2955590753,"dailyStreams":495257,"url":"https://open.spotify.com/track/2Fxmhks0bxGSBdJ92vM42m","popularity":167.6},{"title":"when the party's over","artist":"Billie Eilish","totalStreams":2536486145,"dailyStreams":544837,"url":"https://open.spotify.com/track/43zdsphuZLzwA9k4DJhU0I","popularity":214.8},{"title":"ocean eyes","artist":"Billie Eilish","totalStreams":2267307647,"dailyStreams":924187,"url":"https://open.spotify.com/track/2uIX8YMNjGMD7441kqyyNU","popularity":407.6},{"title":"WILDFLOWER","artist":"Billie Eilish","totalStreams":2185707218,"dailyStreams":1592665,"url":"https://open.spotify.com/track/3QaPy1KgI7nu9FJEQUgn6h","popularity":728.7},{"title":"everything i wanted","artist":"Billie Eilish","totalStreams":2151451091,"dailyStreams":468052,"url":"https://open.spotify.com/track/3ZCTVFBt2Brf31RLEnCkWJ","popularity":217.6},{"title":"Happier Than Ever","artist":"Billie Eilish","totalStreams":1892689610,"dailyStreams":635027,"url":"https://open.spotify.com/track/4RVwu0g32PAqgUiJoXsdF8","popularity":335.5},{"title":"What Was I Made For? [From The Motion Picture \"Barbie\"]","artist":"Billie Eilish","totalStreams":1652111685,"dailyStreams":555990,"url":"https://open.spotify.com/track/6wf7Yu7cxBSPrRlWeSeK0Q","popularity":336.5},{"title":"idontwannabeyouanymore","artist":"Billie Eilish","totalStreams":1392216167,"dailyStreams":325082,"url":"https://open.spotify.com/track/40T5GIqQ1CegGm2PTEl8Bu","popularity":233.5}];
+const PRELOAD = [{"title":"BIRDS OF A FEATHER","artist":"Billie Eilish","totalStreams":3884355287,"dailyStreams":2113691,"url":"https://open.spotify.com/track/6dOtVTDdiauQNBQEDOtlAB","popularity":544.2},{"title":"lovely (with Khalid)","artist":"Billie Eilish (feat. Khalid)","totalStreams":3833299080,"dailyStreams":1081798,"url":"https://open.spotify.com/track/0u2P5u6lvoDfwTYjAADbn4","popularity":282.2},{"title":"bad guy","artist":"Billie Eilish, Justin Bieber","totalStreams":2956096306,"dailyStreams":505553,"url":"https://open.spotify.com/track/2Fxmhks0bxGSBdJ92vM42m","popularity":171.0},{"title":"when the party's over","artist":"Billie Eilish","totalStreams":2537028150,"dailyStreams":542005,"url":"https://open.spotify.com/track/43zdsphuZLzwA9k4DJhU0I","popularity":213.6},{"title":"ocean eyes","artist":"Billie Eilish","totalStreams":2268231200,"dailyStreams":923553,"url":"https://open.spotify.com/track/2uIX8YMNjGMD7441kqyyNU","popularity":407.2},{"title":"WILDFLOWER","artist":"Billie Eilish","totalStreams":2187295830,"dailyStreams":1588612,"url":"https://open.spotify.com/track/3QaPy1KgI7nu9FJEQUgn6h","popularity":726.3},{"title":"everything i wanted","artist":"Billie Eilish","totalStreams":2151922753,"dailyStreams":471662,"url":"https://open.spotify.com/track/3ZCTVFBt2Brf31RLEnCkWJ","popularity":219.2},{"title":"Happier Than Ever","artist":"Billie Eilish","totalStreams":1893342448,"dailyStreams":652838,"url":"https://open.spotify.com/track/4RVwu0g32PAqgUiJoXsdF8","popularity":344.8},{"title":"What Was I Made For? [From The Motion Picture \"Barbie\"]","artist":"Billie Eilish","totalStreams":1652672441,"dailyStreams":560756,"url":"https://open.spotify.com/track/6wf7Yu7cxBSPrRlWeSeK0Q","popularity":339.3},{"title":"idontwannabeyouanymore","artist":"Billie Eilish","totalStreams":1392549222,"dailyStreams":333055,"url":"https://open.spotify.com/track/40T5GIqQ1CegGm2PTEl8Bu","popularity":239.2}];
 
 // State
 let artistIndex = {};  // { "artist name lowercase": { name: "Display Name", count: N } }
@@ -204,6 +219,7 @@ async function applyFilters() {
   }
   if (token !== applyToken) return;
   filtered = songs;
+  renderRelated(songs);
 
   sortFiltered();
   // Cap after sorting: the top 1,000 by total streams is a different set from the
@@ -249,12 +265,13 @@ function sortFiltered() {
 // Rendering
 function render() {
   const totalResults = filtered.length;
-  const totalPages = Math.max(1, Math.ceil(totalResults / PAGE_SIZE));
+  const size = pageSize();
+  const totalPages = Math.max(1, Math.ceil(totalResults / size));
 
   if (currentPage > totalPages) currentPage = totalPages;
 
-  const start = (currentPage - 1) * PAGE_SIZE;
-  const end = Math.min(start + PAGE_SIZE, totalResults);
+  const start = (currentPage - 1) * size;
+  const end = Math.min(start + size, totalResults);
   const page = filtered.slice(start, end);
 
   // Chrome first, and unconditionally. The counts and empty state depend on
@@ -590,6 +607,59 @@ filtersToggle.addEventListener('click', (e) => {
 mobileQuery.addEventListener('change', () => {
   lastRenderSignature = null;
   render();
+});
+
+// Random artist. Uniform over every artist in the index, so it genuinely surfaces the
+// long tail rather than reshuffling the famous names.
+const relatedEl = document.getElementById('related');
+
+// Everyone credited alongside `forName` on their own tracks, most frequent first.
+function relatedArtists(songs, forName) {
+  const self = forName.toLowerCase();
+  const counts = new Map();
+  for (const song of songs) {
+    for (const name of artistNamesFor(song)) {
+      if (name.toLowerCase() === self) continue;
+      counts.set(name, (counts.get(name) || 0) + 1);
+    }
+  }
+  return [...counts.entries()]
+    // Only offer names the index can actually resolve, so no chip is a dead end.
+    .filter(([name]) => artistIndex[name.toLowerCase()])
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .slice(0, RELATED_CAP);
+}
+
+function renderRelated(songs) {
+  relatedEl.innerHTML = '';
+  const related = isGlobal() ? [] : relatedArtists(songs, selectedArtist);
+  if (!related.length) {
+    relatedEl.hidden = true;
+    return;
+  }
+  relatedEl.hidden = false;
+  const label = document.createElement('span');
+  label.className = 'related-label';
+  label.textContent = 'Often appears with';
+  relatedEl.appendChild(label);
+  for (const [name, n] of related) {
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = 'related-chip';
+    chip.textContent = name;
+    chip.title = `${n} song${n === 1 ? '' : 's'} together`;
+    chip.addEventListener('click', () => selectArtist(name, name));
+    relatedEl.appendChild(chip);
+  }
+}
+
+const randomBtn = document.getElementById('random-btn');
+
+randomBtn.addEventListener('click', () => {
+  const keys = Object.keys(artistIndex);
+  if (!keys.length) return;
+  const entry = artistIndex[keys[Math.floor(Math.random() * keys.length)]];
+  selectArtist(entry.name, entry.name);
 });
 
 // Sort commits immediately. There was an Apply button, left over from when it also
