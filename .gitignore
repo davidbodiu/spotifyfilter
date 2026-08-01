@@ -1,0 +1,19 @@
+# Scraper intermediates
+data.json
+scrape_progress.json
+
+# Snapshot archive. These are ~20 MB each and their durable home is still undecided
+# (MISC D2/D3), so they are deliberately not committed. NOTE: that means the copies
+# in snapshots/ currently exist ONLY on local disk.
+snapshots/
+
+# Python
+__pycache__/
+*.py[cod]
+
+# macOS
+.DS_Store
+public/
+
+# wrangler local state
+.wrangler/

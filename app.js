@@ -4,20 +4,30 @@ const DAILY_BUCKETS = [0, 1000, 5000, 10000, 50000, 100000, 500000, 1000000, 500
 
 const PAGE_SIZE = 10;
 const DEFAULT_ARTIST = 'Billie Eilish';
+
+// Global chart. SD-6 keeps the app artist-first, so this is deliberately not an
+// artist: it is a separate ranked surface, capped so it stays a chart rather than a
+// 32,000-page list. The cap is applied AFTER sorting, so "top 1,000" means top by
+// whichever sort is selected.
+const GLOBAL_KEY = '__global__';
+const GLOBAL_LABEL = 'Global chart (all artists)';
+const GLOBAL_CAP = 1000;
 const SHOW_STREAM_SLIDERS = false;
 
 // Billie Eilish preload for instant display (sorted by total streams)
-const PRELOAD = [{"title":"lovely (with Khalid)","artist":"Billie Eilish (feat. Khalid)","totalStreams":3700286167,"dailyStreams":1127974,"url":"https://open.spotify.com/track/0u2P5u6lvoDfwTYjAADbn4","popularity":304.8},{"title":"BIRDS OF A FEATHER","artist":"Billie Eilish","totalStreams":3591941979,"dailyStreams":2455063,"url":"https://open.spotify.com/track/6dOtVTDdiauQNBQEDOtlAB","popularity":683.5},{"title":"bad guy","artist":"Billie Eilish, Justin Bieber","totalStreams":2894198114,"dailyStreams":489843,"url":"https://open.spotify.com/track/2Fxmhks0bxGSBdJ92vM42m","popularity":169.2},{"title":"when the party's over","artist":"Billie Eilish","totalStreams":2458161755,"dailyStreams":723958,"url":"https://open.spotify.com/track/43zdsphuZLzwA9k4DJhU0I","popularity":294.5},{"title":"ocean eyes","artist":"Billie Eilish","totalStreams":2146404624,"dailyStreams":1068260,"url":"https://open.spotify.com/track/2uIX8YMNjGMD7441kqyyNU","popularity":497.7},{"title":"everything i wanted","artist":"Billie Eilish","totalStreams":2085899148,"dailyStreams":613771,"url":"https://open.spotify.com/track/3ZCTVFBt2Brf31RLEnCkWJ","popularity":294.2},{"title":"WILDFLOWER","artist":"Billie Eilish","totalStreams":1969890866,"dailyStreams":1986809,"url":"https://open.spotify.com/track/3QaPy1KgI7nu9FJEQUgn6h","popularity":1008.6},{"title":"Happier Than Ever","artist":"Billie Eilish","totalStreams":1809941834,"dailyStreams":672676,"url":"https://open.spotify.com/track/4RVwu0g32PAqgUiJoXsdF8","popularity":371.7},{"title":"What Was I Made For? [From The Motion Picture \"Barbie\"]","artist":"Billie Eilish","totalStreams":1573453372,"dailyStreams":696600,"url":"https://open.spotify.com/track/6wf7Yu7cxBSPrRlWeSeK0Q","popularity":442.7},{"title":"idontwannabeyouanymore","artist":"Billie Eilish","totalStreams":1350643575,"dailyStreams":348429,"url":"https://open.spotify.com/track/40T5GIqQ1CegGm2PTEl8Bu","popularity":258.0}];
+const PRELOAD = [{"title":"BIRDS OF A FEATHER","artist":"Billie Eilish","totalStreams":3882241596,"dailyStreams":2193342,"url":"https://open.spotify.com/track/6dOtVTDdiauQNBQEDOtlAB","popularity":565.0},{"title":"lovely (with Khalid)","artist":"Billie Eilish (feat. Khalid)","totalStreams":3832217282,"dailyStreams":1078676,"url":"https://open.spotify.com/track/0u2P5u6lvoDfwTYjAADbn4","popularity":281.5},{"title":"bad guy","artist":"Billie Eilish, Justin Bieber","totalStreams":2955590753,"dailyStreams":495257,"url":"https://open.spotify.com/track/2Fxmhks0bxGSBdJ92vM42m","popularity":167.6},{"title":"when the party's over","artist":"Billie Eilish","totalStreams":2536486145,"dailyStreams":544837,"url":"https://open.spotify.com/track/43zdsphuZLzwA9k4DJhU0I","popularity":214.8},{"title":"ocean eyes","artist":"Billie Eilish","totalStreams":2267307647,"dailyStreams":924187,"url":"https://open.spotify.com/track/2uIX8YMNjGMD7441kqyyNU","popularity":407.6},{"title":"WILDFLOWER","artist":"Billie Eilish","totalStreams":2185707218,"dailyStreams":1592665,"url":"https://open.spotify.com/track/3QaPy1KgI7nu9FJEQUgn6h","popularity":728.7},{"title":"everything i wanted","artist":"Billie Eilish","totalStreams":2151451091,"dailyStreams":468052,"url":"https://open.spotify.com/track/3ZCTVFBt2Brf31RLEnCkWJ","popularity":217.6},{"title":"Happier Than Ever","artist":"Billie Eilish","totalStreams":1892689610,"dailyStreams":635027,"url":"https://open.spotify.com/track/4RVwu0g32PAqgUiJoXsdF8","popularity":335.5},{"title":"What Was I Made For? [From The Motion Picture \"Barbie\"]","artist":"Billie Eilish","totalStreams":1652111685,"dailyStreams":555990,"url":"https://open.spotify.com/track/6wf7Yu7cxBSPrRlWeSeK0Q","popularity":336.5},{"title":"idontwannabeyouanymore","artist":"Billie Eilish","totalStreams":1392216167,"dailyStreams":325082,"url":"https://open.spotify.com/track/40T5GIqQ1CegGm2PTEl8Bu","popularity":233.5}];
 
 // State
 let allSongs = [];
 let artistIndex = {};  // { "artist name lowercase": { name: "Display Name", count: N } }
-let selectedArtist = DEFAULT_ARTIST;
+let selectedArtist = DEFAULT_ARTIST;   // an artist name, or GLOBAL_KEY
+let selectedLabel = DEFAULT_ARTIST;    // what the input and results line show
 let filtered = [];
 let currentPage = 1;
 let sortKey = 'totalStreams';
 let sortDir = 'desc';
 let highlightedIdx = -1;
+let lastRenderSignature = null;
 
 // DOM refs
 const artistInput = document.getElementById('artist-input');
@@ -71,23 +81,35 @@ function setupSlider(minSlider, maxSlider, fill, minLabel, maxLabel, buckets) {
   update();
 }
 
-// Build artist index from all songs
+// Artist names for a song. Prefers the structured fields; falls back to parsing the
+// display string. The fallback is PERMANENT: archived snapshots in snapshots/ predate
+// leads/features, and reading them is the basis of any future time-window feature.
+function artistNamesFor(song) {
+  if (song.leads) return [...song.leads, ...(song.features || [])];
+  return parseArtistNames(song.artist);
+}
+
+// Build artist index from all songs. Each entry holds that artist's songs, so lookups
+// are a dict hit instead of a scan over the whole dataset.
 function buildArtistIndex() {
   artistIndex = {};
   for (const song of allSongs) {
-    const artistStr = song.artist;
-    // Extract individual artist names
-    const names = parseArtistNames(artistStr);
-    for (const name of names) {
+    for (const name of artistNamesFor(song)) {
       const key = name.toLowerCase();
       if (!artistIndex[key]) {
-        artistIndex[key] = { name: name, count: 0 };
+        artistIndex[key] = { name: name, songs: [] };
       }
-      artistIndex[key].count++;
+      // Names for one song are processed consecutively, so checking the tail is enough
+      // to stop a song landing twice under keys that differ only by case.
+      const songs = artistIndex[key].songs;
+      if (songs[songs.length - 1] !== song) songs.push(song);
     }
   }
 }
 
+// Legacy path: recover names from the display string. Lossy for names containing
+// commas ("Tyler, The Creator" splits into two), which is why the scraper now emits
+// leads/features directly.
 function parseArtistNames(artistStr) {
   // "Drake (feat. WizKid, Kyla)" -> ["Drake", "WizKid", "Kyla"]
   const names = [];
@@ -105,13 +127,20 @@ function parseArtistNames(artistStr) {
   return names;
 }
 
-// Filter songs by selected artist
+// Songs for the current selection. Returns a copy, since callers sort in place.
 function songsForArtist(artistName) {
-  const lower = artistName.toLowerCase();
-  return allSongs.filter(song => {
-    const names = parseArtistNames(song.artist).map(n => n.toLowerCase());
-    return names.includes(lower);
-  });
+  if (artistName === GLOBAL_KEY) return allSongs.slice();
+  const entry = artistIndex[artistName.toLowerCase()];
+  return entry ? entry.songs.slice() : [];
+}
+
+function isGlobal() {
+  return selectedArtist === GLOBAL_KEY;
+}
+
+function sortLabel() {
+  const opt = sortSelect.options[sortSelect.selectedIndex];
+  return opt ? opt.textContent.toLowerCase() : 'total streams';
 }
 
 // Apply filters + sort on current artist's songs
@@ -123,13 +152,18 @@ function applyFilters() {
   filtered = songsForArtist(selectedArtist);
 
   sortFiltered();
+  // Cap after sorting: the top 1,000 by total streams is a different set from the
+  // top 1,000 by popularity.
+  if (isGlobal() && filtered.length > GLOBAL_CAP) filtered = filtered.slice(0, GLOBAL_CAP);
+
   currentPage = 1;
   render();
 }
 
-function selectArtist(name) {
-  selectedArtist = name;
-  artistInput.value = name;
+function selectArtist(key, label) {
+  selectedArtist = key;
+  selectedLabel = label || key;
+  artistInput.value = selectedLabel;
   closeDropdown();
   applyFilters();
 }
@@ -162,21 +196,39 @@ function render() {
   const end = Math.min(start + PAGE_SIZE, totalResults);
   const page = filtered.slice(start, end);
 
-  // Results count
+  // Chrome first, and unconditionally. The counts and empty state depend on
+  // totalResults, which legitimately changes even when the visible rows do not (the
+  // preload shows 10 of Billie Eilish's songs, the full dataset shows 10 of 78).
   if (totalResults === 0) {
     resultsCount.textContent = '';
     noResults.style.display = 'block';
     tableWrapper.style.display = 'none';
-    mobileCards.innerHTML = '';
   } else {
-    resultsCount.textContent = `${escapeHtml(selectedArtist)} \u2014 Showing ${start + 1}\u2013${end} of ${totalResults.toLocaleString()} songs`;
+    // textContent is already injection-safe; escaping here would double-encode "&"
+    // in names like "Mumford & Sons".
+    resultsCount.textContent = isGlobal()
+      ? `Global chart: showing ${start + 1}\u2013${end} of the top ${totalResults.toLocaleString()} songs by ${sortLabel()}`
+      : `${selectedLabel}: showing ${start + 1}\u2013${end} of ${totalResults.toLocaleString()} songs`;
     noResults.style.display = 'none';
     tableWrapper.style.display = '';
   }
+  renderPagination(totalPages);
 
-  // Clear old iframes properly to release Spotify embed resources
+  // Now gate the expensive part. The row DOM and its ten Spotify iframes depend only
+  // on WHICH songs are visible, not on how many exist in total. Skipping the rebuild
+  // when those are unchanged is what removes the load flash, and it keeps playing
+  // embeds alive because nothing detaches them.
+  const rowSignature = selectedArtist + '|' + sortKey + '|' + sortDir + '|' + start + '|' +
+    page.map(s => s.url + ':' + s.totalStreams + ':' + s.dailyStreams).join(',');
+  if (rowSignature === lastRenderSignature) return;
+  lastRenderSignature = rowSignature;
+
+  // Release Spotify embed resources before anything detaches their nodes. Blanking src
+  // first is load-bearing (SD-3): removing a live iframe leaks the embed and playback
+  // dies after a few page changes.
   resultsBody.querySelectorAll('iframe').forEach(f => { f.src = ''; f.remove(); });
   mobileCards.querySelectorAll('iframe').forEach(f => { f.src = ''; f.remove(); });
+  if (totalResults === 0) mobileCards.innerHTML = '';
 
   // Table rows
   resultsBody.innerHTML = '';
@@ -213,8 +265,6 @@ function render() {
     mobileCards.appendChild(card);
   });
 
-  // Pagination
-  renderPagination(totalPages);
 }
 
 function renderPagination(totalPages) {
@@ -275,10 +325,13 @@ function scrollToResults() {
   document.querySelector('.results').scrollIntoView({ behavior: 'smooth' });
 }
 
+// Escapes for BOTH text and attribute contexts. The DOM textContent/innerHTML trick
+// alone does not escape quotes, which silently broke every title="..." built by
+// truncate() for a value containing a double quote.
 function escapeHtml(str) {
   const div = document.createElement('div');
   div.textContent = str;
-  return div.innerHTML;
+  return div.innerHTML.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
 function truncate(str, max) {
@@ -297,10 +350,12 @@ function showDropdown(matches) {
   matches.forEach((m, i) => {
     const div = document.createElement('div');
     div.className = 'artist-option';
-    div.innerHTML = `<span class="artist-option-name">${escapeHtml(m.name)}</span><span class="artist-option-count">${m.count} songs</span>`;
+    div.innerHTML = `<span class="artist-option-name">${escapeHtml(m.name)}</span><span class="artist-option-count">${m.count.toLocaleString()} songs</span>`;
+    div.dataset.key = m.key;
+    div.dataset.label = m.name;
     div.addEventListener('mousedown', (e) => {
       e.preventDefault(); // prevent blur from firing before click
-      selectArtist(m.name);
+      selectArtist(m.key, m.name);
     });
     artistDropdown.appendChild(div);
   });
@@ -333,7 +388,8 @@ artistInput.addEventListener('input', () => {
   const matches = [];
   for (const key in artistIndex) {
     if (key.includes(query)) {
-      matches.push(artistIndex[key]);
+      const entry = artistIndex[key];
+      matches.push({ name: entry.name, key: entry.name, count: entry.songs.length });
     }
   }
   // Sort: exact start match first, then by song count
@@ -344,7 +400,20 @@ artistInput.addEventListener('input', () => {
     return b.count - a.count;
   });
 
-  showDropdown(matches.slice(0, 15));
+  // The global chart rides at the top while the query is still short, or when it
+  // plainly matches, so it is discoverable without polluting real artist searches.
+  const wantsGlobal = query.length <= 2 ||
+    'global chart all artists'.includes(query) || 'all'.startsWith(query);
+  const rows = matches.slice(0, 15);
+  if (wantsGlobal) {
+    rows.unshift({
+      name: GLOBAL_LABEL,
+      key: GLOBAL_KEY,
+      count: Math.min(GLOBAL_CAP, allSongs.length),
+    });
+  }
+
+  showDropdown(rows);
 });
 
 artistInput.addEventListener('focus', () => {
@@ -353,8 +422,8 @@ artistInput.addEventListener('focus', () => {
 
 artistInput.addEventListener('blur', () => {
   closeDropdown();
-  // Restore selected artist name if input was cleared/changed without selecting
-  artistInput.value = selectedArtist;
+  // Restore the selected label if the input was cleared or edited without selecting.
+  artistInput.value = selectedLabel;
 });
 
 artistInput.addEventListener('keydown', (e) => {
@@ -368,14 +437,78 @@ artistInput.addEventListener('keydown', (e) => {
   } else if (e.key === 'Enter') {
     e.preventDefault();
     if (highlightedIdx >= 0 && highlightedIdx < options.length) {
-      const name = options[highlightedIdx].querySelector('.artist-option-name').textContent;
-      selectArtist(name);
+      const opt = options[highlightedIdx];
+      selectArtist(opt.dataset.key, opt.dataset.label);
     }
   } else if (e.key === 'Escape') {
     closeDropdown();
     artistInput.blur();
   }
 });
+
+// Theme: System -> Light -> Dark -> System.
+// "System" means no data-theme attribute, so the CSS prefers-color-scheme block
+// applies and the device wins. The other two stamp an explicit override.
+const THEME_KEY = 'chartrank-theme';
+const THEME_STATES = [
+  { value: 'system', icon: 'A', label: 'System' },
+  { value: 'light',  icon: 'L', label: 'Light' },
+  { value: 'dark',   icon: 'D', label: 'Dark' },
+];
+
+const themeToggle = document.getElementById('theme-toggle');
+const themeIcon = document.getElementById('theme-toggle-icon');
+const themeLabel = document.getElementById('theme-toggle-label');
+
+function readStoredTheme() {
+  // Safari throws on localStorage over file://, so every access is guarded.
+  try {
+    const stored = localStorage.getItem(THEME_KEY);
+    return stored === 'light' || stored === 'dark' ? stored : 'system';
+  } catch (e) {
+    return 'system';
+  }
+}
+
+function applyTheme(value) {
+  currentTheme = value;
+  if (value === 'system') {
+    document.documentElement.removeAttribute('data-theme');
+    try { localStorage.removeItem(THEME_KEY); } catch (e) {}
+  } else {
+    document.documentElement.setAttribute('data-theme', value);
+    try { localStorage.setItem(THEME_KEY, value); } catch (e) {}
+  }
+  const state = THEME_STATES.find(s => s.value === value) || THEME_STATES[0];
+  themeIcon.textContent = state.icon;
+  themeLabel.textContent = state.label;
+  themeToggle.setAttribute('aria-label', `Colour theme: ${state.label}`);
+  syncThemeColor(value);
+}
+
+// The two <meta name="theme-color"> tags are media-gated on the device preference, so
+// an explicit override left the browser chrome contradicting the page.
+function syncThemeColor(value) {
+  const dark = value === 'dark' || (value === 'system' &&
+    window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+  document.querySelectorAll('meta[name="theme-color"]').forEach(m => m.remove());
+  const meta = document.createElement('meta');
+  meta.name = 'theme-color';
+  meta.content = dark ? '#121212' : '#eef0f3';
+  document.head.appendChild(meta);
+}
+
+// In-memory state is the source of truth; storage is best-effort persistence. Reading
+// it back would jam the cycle wherever localStorage is unavailable, which includes the
+// file:// path this app documents.
+let currentTheme = readStoredTheme();
+
+themeToggle.addEventListener('click', () => {
+  const i = THEME_STATES.findIndex(s => s.value === currentTheme);
+  applyTheme(THEME_STATES[(i + 1) % THEME_STATES.length].value);
+});
+
+applyTheme(currentTheme);
 
 // Filters toggle
 const filtersToggle = document.getElementById('filters-toggle');
@@ -393,24 +526,44 @@ document.getElementById('apply-btn').addEventListener('click', applyFilters);
 
 // Init
 async function init() {
-  // Show preloaded data instantly
+  // Show preloaded data instantly. The index must be built here too, since artist
+  // lookup is now an index hit rather than a scan over allSongs.
   allSongs = PRELOAD;
+  buildArtistIndex();
   artistInput.value = DEFAULT_ARTIST;
   applyFilters();
   resultsCount.textContent = 'Loading full dataset...';
 
   // Load full dataset in background
   try {
-    const res = await fetch('data.json.gz');
-    const ds = new DecompressionStream('gzip');
-    const decompressed = res.body.pipeThrough(ds);
-    const text = await new Response(decompressed).text();
-    allSongs = JSON.parse(text);
+    allSongs = await loadDataset();
     buildArtistIndex();
     applyFilters();
   } catch (e) {
-    resultsCount.textContent = 'Failed to load full dataset';
+    // fetch() is blocked on file:// by every modern browser (the origin is opaque),
+    // so opening index.html straight off disk can only ever show PRELOAD. Say that
+    // plainly instead of a generic failure the user cannot act on.
+    resultsCount.textContent = location.protocol === 'file:'
+      ? `Sample data only (${allSongs.length} songs). Browsers block file access, so the full dataset needs a local server: run "python3 -m http.server" in this folder, then open http://localhost:8000`
+      : `Failed to load full dataset (${e.message}). Showing ${allSongs.length} sample songs.`;
   }
+}
+
+async function loadDataset() {
+  const res = await fetch('data.json.gz');
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  const bytes = new Uint8Array(await res.arrayBuffer());
+
+  // Some hosts serve .gz with Content-Encoding: gzip, in which case the browser has
+  // already decompressed it and these bytes are plain JSON. Sniff the gzip magic
+  // number rather than assuming: guessing wrong throws deep inside DecompressionStream
+  // with an error that looks nothing like a config problem.
+  if (bytes[0] !== 0x1f || bytes[1] !== 0x8b) {
+    return JSON.parse(new TextDecoder().decode(bytes));
+  }
+
+  const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));
+  return JSON.parse(await new Response(stream).text());
 }
 
 init();

@@ -1,0 +1,23 @@
+{
+  // Static-assets-only Worker. There is no `main`, so no Worker script runs: Cloudflare
+  // just serves the files in `assets.directory`.
+  //
+  // This config previously existed ONLY on the unmerged branch
+  // origin/cloudflare/workers-autoconfig, so `wrangler deploy` from main failed with a
+  // missing-config error. Verified via `wrangler deployments list --name spotifyfilter`:
+  // every deployment is Source "Upload", i.e. a manual `wrangler deploy`. There is NO
+  // git integration, so pushing to GitHub does not publish anything.
+  "name": "spotifyfilter",
+  "compatibility_date": "2025-09-27",
+  "observability": {
+    "enabled": true
+  },
+  "assets": {
+    // public/ is a staging directory populated by deploy.sh, NOT source. It was "."
+    // (the repo root), which uploads whatever happens to be on disk: after a refresh
+    // that includes the 106 MB data.json, over the 25 MiB per-file cap. .assetsignore
+    // was tested against wrangler 4.118 and does not filter, so the allowlist in
+    // deploy.sh is the mechanism.
+    "directory": "./public"
+  }
+}

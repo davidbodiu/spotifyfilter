@@ -151,7 +151,16 @@ def save_progress(progress):
 def build_output(songs_by_url):
     """
     Deduplicate songs by Spotify URL and combine artists.
-    Format: "Lead Artist (feat. Feature1, Feature2)"
+
+    Emits both a display string and structured name lists:
+      "artist"   -> "Lead Artist (feat. Feature1, Feature2)"  (display only)
+      "leads"    -> ["Lead Artist"]
+      "features" -> ["Feature1", "Feature2"]
+
+    The display string is lossy: a name containing a comma cannot be recovered by
+    splitting on commas. Consumers must use "leads"/"features" for anything other
+    than display.
+
     Leads come first (non-* entries), features in parens.
     Ties broken by artist rank (lower = higher ranked).
     """
@@ -194,6 +203,8 @@ def build_output(songs_by_url):
         output.append({
             "title": title,
             "artist": artist_str,
+            "leads": lead_names,
+            "features": feature_names,
             "totalStreams": total_streams,
             "dailyStreams": daily_streams,
             "url": url,

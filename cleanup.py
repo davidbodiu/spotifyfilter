@@ -53,6 +53,49 @@ def shorter_title(a, b):
     return a if len(a) <= len(b) else b
 
 
+def parse_artist_string(s):
+    """
+    Split a display artist string into (leads, features).
+
+    Only used to backfill records produced before structured fields existed. It splits
+    on commas and so cannot recover names that contain commas. New scrapes carry
+    "leads"/"features" directly and never go through this.
+    """
+    match = re.match(r'^(.*?)(?:\s*\(feat\.\s*(.*)\))?$', s)
+    if match:
+        leads = [n.strip() for n in match.group(1).split(",") if n.strip()]
+        feats = [n.strip() for n in match.group(2).split(",") if n.strip()] if match.group(2) else []
+    else:
+        leads = [s.strip()] if s.strip() else []
+        feats = []
+    return leads, feats
+
+
+def dedupe_names(*lists):
+    """Concatenate name lists, preserving order, dropping case-insensitive duplicates."""
+    seen = set()
+    out = []
+    for lst in lists:
+        for name in lst or []:
+            key = name.lower()
+            if key not in seen:
+                seen.add(key)
+                out.append(name)
+    return out
+
+
+def merge_name_lists(leads_a, feats_a, leads_b, feats_b):
+    """
+    Merge two (leads, features) pairs. Exact dedup only, no substring absorption:
+    every distinct artist must survive into the index, even one whose name is
+    contained in a collaborator's.
+    """
+    leads = dedupe_names(leads_a, leads_b)
+    lead_keys = {n.lower() for n in leads}
+    feats = [n for n in dedupe_names(feats_a, feats_b) if n.lower() not in lead_keys]
+    return leads, feats
+
+
 def merge_artists(artist_a, artist_b):
     """Merge two artist strings, combining feat. sections and deduplicating names."""
     def parse_artist(s):
@@ -126,10 +169,16 @@ def merge_artists(artist_a, artist_b):
 
 def cleanup(songs):
     """Run all cleanup steps on the song list."""
-    # Step 1: Fix encoding
+    # Step 1: Fix encoding, and guarantee every record has structured artist fields
     for song in songs:
         song["title"] = fix_encoding(song["title"])
         song["artist"] = fix_encoding(song["artist"])
+        leads = [fix_encoding(n) for n in song.get("leads") or []]
+        feats = [fix_encoding(n) for n in song.get("features") or []]
+        if not leads and not feats:
+            leads, feats = parse_artist_string(song["artist"])
+        song["leads"] = leads
+        song["features"] = feats
 
     # Step 2: Deduplicate by normalized title + similar streams
     # Group by normalized title
@@ -169,9 +218,18 @@ def cleanup(songs):
                 # Merge: cleanest title, highest streams, combined artists
                 best = cluster[0]
                 for other in cluster[1:]:
+                    leads, feats = merge_name_lists(
+                        best["leads"], best["features"],
+                        other["leads"], other["features"],
+                    )
                     best = {
                         "title": shorter_title(best["title"], other["title"]),
+                        # Display string keeps substring absorption ("Macklemore" folds
+                        # into "Macklemore & Ryan Lewis"); the name lists deliberately
+                        # do not, so search still finds both.
                         "artist": merge_artists(best["artist"], other["artist"]),
+                        "leads": leads,
+                        "features": feats,
                         "totalStreams": max(best["totalStreams"], other["totalStreams"]),
                         "dailyStreams": max(best["dailyStreams"], other["dailyStreams"]),
                         "url": best["url"],

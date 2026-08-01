@@ -3,20 +3,44 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ChartRank — See Every Song by Any Artist, Ranked by Spotify Streams</title>
+  <title>ChartRank: See Every Song by Any Artist, Ranked by Spotify Streams</title>
   <meta name="description" content="Go beyond the top 10. See every song by any artist ranked by total streams, daily plays, or popularity. Full streaming data for 3,000+ artists.">
   <link rel="canonical" href="https://chartrank.app">
 
   <!-- Open Graph -->
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://chartrank.app">
-  <meta property="og:title" content="ChartRank — See Every Song by Any Artist, Ranked by Spotify Streams">
+  <meta property="og:title" content="ChartRank: See Every Song by Any Artist, Ranked by Spotify Streams">
   <meta property="og:description" content="Go beyond the top 10. See every song by any artist ranked by total streams, daily plays, or popularity. Full streaming data for 3,000+ artists.">
 
   <!-- Twitter -->
   <meta name="twitter:card" content="summary">
-  <meta name="twitter:title" content="ChartRank — See Every Song by Any Artist, Ranked by Spotify Streams">
+  <meta name="twitter:title" content="ChartRank: See Every Song by Any Artist, Ranked by Spotify Streams">
   <meta name="twitter:description" content="Go beyond the top 10. See every song by any artist ranked by total streams, daily plays, or popularity. Full streaming data for 3,000+ artists.">
+
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#fbfbfc" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#121212" media="(prefers-color-scheme: dark)">
+
+  <!-- Icons -->
+  <link rel="icon" href="/favicon.ico" sizes="32x32">
+  <link rel="icon" href="/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+
+  <!-- Stamp an explicit theme before first paint so a manual choice does not
+       flash the device theme first. Must stay inline and above the stylesheet.
+       Safari throws a SecurityError on localStorage over file://, hence the catch. -->
+  <script>
+    (function () {
+      try {
+        var t = localStorage.getItem('chartrank-theme');
+        if (t === 'light' || t === 'dark') {
+          document.documentElement.setAttribute('data-theme', t);
+        }
+      } catch (e) {}
+    })();
+  </script>
 
   <link rel="stylesheet" href="styles.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -26,11 +50,19 @@
   <div class="app">
     <header class="header">
       <div class="logo">
-        <svg viewBox="0 0 24 24" width="32" height="32" fill="#1DB954">
-          <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381C8.64 5.801 15.6 6.06 20.04 8.7c.5.3.7 1.02.4 1.56-.301.42-1.02.599-1.459.42z"/>
+        <svg class="logo-mark" viewBox="0 0 24 24" width="32" height="32" aria-hidden="true">
+          <rect x="3"  y="13" width="4.5" height="8"  rx="1.5"/>
+          <rect x="9.75" y="8" width="4.5" height="13" rx="1.5"/>
+          <rect x="16.5" y="3" width="4.5" height="18" rx="1.5"/>
         </svg>
         <h1>ChartRank</h1>
       </div>
+
+      <button id="theme-toggle" class="theme-toggle" type="button"
+              aria-label="Colour theme: follow device">
+        <span id="theme-toggle-icon" aria-hidden="true">A</span>
+        <span id="theme-toggle-label">System</span>
+      </button>
     </header>
 
     <section class="filters">
