@@ -431,7 +431,9 @@ function showDropdown(matches) {
   matches.forEach((m, i) => {
     const div = document.createElement('div');
     div.className = 'artist-option';
-    div.innerHTML = `<span class="artist-option-name">${escapeHtml(m.name)}</span><span class="artist-option-count">${m.count.toLocaleString()} songs</span>`;
+    const countHtml = m.count == null ? ''
+      : `<span class="artist-option-count">${m.count.toLocaleString()} songs</span>`;
+    div.innerHTML = `<span class="artist-option-name">${escapeHtml(m.name)}</span>${countHtml}`;
     div.dataset.key = m.key;
     div.dataset.label = m.name;
     div.addEventListener('mousedown', (e) => {
@@ -490,7 +492,9 @@ artistInput.addEventListener('input', () => {
     rows.unshift({
       name: GLOBAL_LABEL,
       key: GLOBAL_KEY,
-      count: GLOBAL_CAP,
+      // No count: the chart is the top 1,000 PER SORT (largely different sets), so a
+      // single "1,000 songs" was misleading. Artist rows keep their counts.
+      count: null,
     });
   }
 

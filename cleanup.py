@@ -84,6 +84,41 @@ def dedupe_names(*lists):
     return out
 
 
+# Two same-titled records within STREAM_TOLERANCE may be one recording listed twice, or
+# two unrelated songs that happen to share a title. This decides which.
+NEAR_IDENTICAL = 0.99   # totals this close mean "the same recording", see should_merge()
+
+
+def shares_artist(a, b):
+    """True when two records credit at least one artist in common."""
+    def names(song):
+        return {n.lower() for n in (song.get("leads") or []) + (song.get("features") or [])}
+    return bool(names(a) & names(b))
+
+
+def should_merge(a, b):
+    """
+    Whether two same-titled, similar-streamed records are really one song.
+
+    A shared artist is the clearest signal. But it is NOT necessary, and assuming it was
+    is what made the first attempt at this worse than no gate at all: kworb lists a
+    collaboration under a separate track ID on each artist's page, and scrape.py credits
+    each record only with the artists whose page carried that URL. So Starboy exists
+    twice, as leads=["The Weeknd"] and as features=["Daft Punk"], with byte-identical
+    stream counts and no name in common. Requiring a shared artist split 88 such pairs
+    back into duplicate rows in the global top 1,000.
+
+    Near-identical totals are the second signal, and they are what actually separates the
+    two cases. One recording counted twice agrees to within a rounding error; two
+    different songs do not. Sia's "The Greatest" and Billie Eilish's "THE GREATEST" sit
+    1.765% apart, well outside NEAR_IDENTICAL, so they stay separate.
+    """
+    if shares_artist(a, b):
+        return True
+    lo, hi = sorted((a["totalStreams"], b["totalStreams"]))
+    return bool(hi) and lo / hi >= NEAR_IDENTICAL
+
+
 def merge_name_lists(leads_a, feats_a, leads_b, feats_b):
     """
     Merge two (leads, features) pairs. Exact dedup only, no substring absorption:
@@ -206,9 +241,14 @@ def cleanup(songs):
             for j in range(i + 1, len(group)):
                 if used[j]:
                     continue
-                if streams_match(group[i]["totalStreams"], group[j]["totalStreams"]):
-                    cluster.append(group[j])
-                    used[j] = True
+                if not streams_match(group[i]["totalStreams"], group[j]["totalStreams"]):
+                    continue
+                # Title plus stream proximity alone merged Sia's "The Greatest" into
+                # Billie Eilish's "THE GREATEST". See should_merge().
+                if not should_merge(group[i], group[j]):
+                    continue
+                cluster.append(group[j])
+                used[j] = True
             clusters.append(cluster)
 
         for cluster in clusters:

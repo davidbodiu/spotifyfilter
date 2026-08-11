@@ -439,3 +439,146 @@ Updated after every request. See the maintenance protocol in `CLAUDE.md`.
         |
   (( no application code changed ))
 ```
+
+## R21, 1 August: "does the repo grow?" / "why does splitting help storage?"
+
+```
+  (( two storage questions ))
+        |
+        [ measure, not theorise ]
+        |    repo already 95 MB; 99.7% is dead data.json blobs from March
+        |    weekly commit under SD-19: 0.5 KiB (4 simulated weeks)
+        |    committing the sharded tree: 0.78 GB/yr; the monolith: 0.95 GB/yr
+        |
+        !!! my earlier "~8 GB/yr" ignored zlib; "~1.6 GB/yr" ignored deltas
+        |
+  (( answer: "commit or not" governs; "split or not" barely matters ))
+```
+
+## R22, 1 August: "so because it is compressed, that's the problem"
+
+```
+  (( user names the mechanism ))
+        |
+        [ confirm, bound the scope ]
+        |    gzip defeats git delta compression: 1 changed byte -> whole new blob
+        |    explains 0.95 vs 0.78 GB/yr, NOT why the repo is fine (SD-19 does)
+        |
+  (( I-8: never commit a pre-compressed artifact ))
+```
+
+## R23, 1 August: "can we see 50 songs per page?"
+
+```
+  (( request ))          !!! clashes with SD-3 (PAGE_SIZE 10, iframe fix)
+        |
+        [ name the clash, then implement ]
+        |    render() built BOTH layouts: 100 iframes at 50/page
+        [ build only the visible layout ] --> 50, layout in rowSignature
+        |
+  (( G-9: NEEDS FIELD TEST; March broke at 40 constructed iframes ))
+```
+
+## R24, 1 August: Sia/Billie chimera + rescrape + BMC + random artist
+
+```
+  (( "billie eilish does not feature in sia's the greatest?" ))
+        |
+        [ trace raw -> shipped ] --> two songs, titles fold case, totals 1.765% apart
+        !!! merged into one record: Sia's total, BILLIE'S daily, both credited
+        |
+        [ shares_artist() gate ] + [ rescrape started ]
+        [ "Surprise me" uniform random ] [ footer, BMC link gated on handle ]
+        [ em dashes: 5 remain, all inside real song titles -> declined ]
+        |
+  (( fix verified on the reported case only... see R25 ))
+```
+
+## R25, 1 August: "related artists sounds like a great idea"
+
+```
+  (( request ))
+        |
+        [ derive from the artist's own shard ] --> byte-identical to build_pages
+        [ chips capped 12, index-resolvable only, hidden for global/empty ]
+        |
+        [ adversarial review of the turn ]
+        !!! R24's gate OVERTURNED: kworb lists collabs under a track ID per
+        !!! artist page -> duplicates with ZERO shared names (Starboy x2)
+        !!! my fix: 88 duplicate rows in the global top 1,000 vs 0 before
+        |
+        [ should_merge(): shared artist OR totals within 1% ]
+        |
+  (( 323,152 songs projected, 0 top-1000 dupes, both cases verified ))
+```
+
+## R26, 1 August: "30 on mobile" + BMC widget + "ok pushed"
+
+```
+  (( mobile crashed at the bottom of the page ))
+        |
+        !!! 50 lazy embeds all live by scroll-end; phone tab discarded
+        [ pageSize(): 50 desktop / 30 mobile ]
+        [ official BMC widget: main app + 2,998 artist pages (G-11) ]
+        |
+        [ scrape done: 507,254 raw -> 323,251 songs, 75.2% of cap ]
+        [ four invariants verified ] --> deploy
+        |
+  (( push at 21:59 produced NO build deployment: disconnect held ))
+```
+
+## R27, 11 August: "did the site update yesterday?"
+
+```
+  (( verify the automation, not just the checkmark ))
+        |
+        [ bot commits Mon 03 + Mon 10 Aug, deploys minutes later ]
+        [ all 200 of top-200 songs increased ] --> genuinely fresh
+        [ invariants: Starboy one record, 0 dupes, slugs 0 reassigned ]
+        |
+        !!! G-12: 11 artists fell out of the top 3,000; their pages 404
+        |    sitemap correctly drops them; slugs stay reserved
+        |
+  (( both weeks succeeded unattended ))
+```
+
+## R28, 11 August: "why is the global chart only 1k songs?"
+
+```
+  (( question about SD-14, the user's own D1(c) choice ))
+        |
+        [ answer with provenance, not re-litigation ]
+        |    product: uncapped = 6,465 pages
+        |    architecture: global.json is precomputed top-1000 PER SORT
+        |    overlap totals/popularity 0/1000 -> 2,371 distinct songs surfaced
+        |
+        [ G-13: "(all artists)" label reads as "all songs"; relabel offered ]
+        |
+  (( no code changed ))
+```
+
+## R29, 11 August: dropdown count off + the stale-pipeline discovery
+
+```
+  (( "top 1k per sort (already true) + no song count on the global row" ))
+        |
+        [ check before deploying ] --> local data 1 Aug, live data 10 Aug
+        !!! naive deploy would regress live by 9 days
+        |
+        [ inspect uncommitted diffs ]
+        !!! cleanup.py should_merge and build_pages.py widget NEVER COMMITTED
+        !!! CI ran the OLD pipeline on 3 + 10 Aug:
+        !!!   chimera back live (Sia/Billie merged again), widget gone from pages
+        |
+        [ pull origin ] [ reconstruct 10-Aug data from live shards: 322,541 songs ]
+        |    fidelity: PRELOAD byte-equal, index content-equal,
+        |    global sorts equal but one tie at rank 1,000
+        |
+        [ dropdown: global row count -> null ]
+        [ guards: deploy.sh freshness stamp; CI chimera invariant;
+          90-day dataset artifacts (G-14) ]
+        |
+        [ deploy: widget restored, UI fixed, data unchanged ]
+        |
+  (( data heals on next scrape IF the pipeline fixes get committed (B-19) ))
+```

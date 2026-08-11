@@ -36,7 +36,7 @@ silently.
 | SD-16 | `#1DB954` is a FILL only, never text. `--accent-text` carries the readable green. | R16 | The brand green is 2.50:1 on white, failing WCAG AA for text. |
 | SD-17 | Spotify's wordmark is not used. Weekly refresh runs on GitHub Actions, not Cloudflare compute. | R16 | Trademark exposure; no CF product can hold a 40 to 75 minute job. |
 | SD-18 | The `artistNamesFor()` legacy fallback is permanent, not transitional. | R16 | Archived snapshots predate `leads`/`features` and are the time-series anchor. |
-| SD-19 | The generated surface (artist pages, shards, sitemap) and `data.json.gz` are **never committed**. Every deploy builds them first. | R19 | Measured 154 MB per build; committing weekly is ~8 GB/year and git never reclaims deleted blobs. |
+| SD-19 | The generated surface (artist pages, shards, sitemap) and `data.json.gz` are **never committed**. Every deploy builds them first. | R19 | Measured 0.78 GB/year if committed vs 0.5 KiB/week as-is; git never reclaims deleted blobs. See I-7. |
 | SD-20 | The Cloudflare **Workers Builds git integration must stay disabled**. Deploys come from `deploy.sh` or CI. | R19 | It only sees the repo, which by SD-19 has no data. It would publish a broken site on every push. |
 | SD-21 | `slugs.json` is append-only. A name's slug is never reassigned. | R19 | A changed slug destroys its own URL, backlinks and rankings. |
 | SD-22 | Spotify embeds are left exactly as they are, dark in both themes. | R19 | Verified: no light embed exists. User chose to leave it. |
@@ -530,3 +530,242 @@ recorded in R17: an edit that was never asserted to have applied. Every document
 write in this request asserts its anchor first.
 
 Protocol extended from three files to five; SD-11 updated.
+
+**R21. "does the size of the repo grow or is it fine?" then "why does splitting up mean
+only growing by a fraction in storage?" then "i still don't understand why splitting is
+better for yearly storage"**
+
+Answered by measurement, and the answer is that **splitting is not why storage is fine**.
+Two orthogonal decisions had been presented as one: sharding the data (R-3) and no longer
+committing generated output (SD-19). Only the second governs repo growth.
+
+Measured: weekly commit cost under SD-19 is 0.5 KiB, over four simulated weeks with
+stream numbers moving as in a real refresh. Committing the sharded tree instead would
+cost 0.78 GB/year; committing the old monolith, 0.95 GB/year.
+
+The user's intuition had a real basis, which the first answer wrongly dismissed: sharding
+IS about 18% cheaper when committed, because git delta-compresses plain text across
+revisions but cannot delta a gzip stream, so any change to the monolith rewrites the whole
+blob.
+
+Also found: the repo is already 95 MB, of which **99.7% is dead `data.json` blobs**
+committed three times in March and since deleted. Git never reclaims those.
+
+Two of my own figures were corrected: "~8 GB/year" (a `du` figure times 52, ignoring
+zlib) and "~1.6 GB/year" (ignoring delta compression). Recorded as I-7.
+
+No code changed.
+
+**R22. "ok i get it, so because it is compressed that's the problem"**
+
+Confirmed, with the scope corrected: pre-compression defeats git's delta compression and
+explains the 0.95 vs 0.78 GB/year gap between the two commit-it options. It does not
+explain why the repo is fine, which is entirely that neither is committed (SD-19).
+
+Generalised into I-8: never commit a pre-compressed artifact to git. Store the
+uncompressed form and let git compress it, or keep it out of the repo entirely.
+
+No code changed.
+
+**R23. "Can we see 50 songs per page please?"**
+
+Clashes with SD-3, which pinned `PAGE_SIZE` at 10 after Spotify embeds stopped playing
+(R5.2). Flagged before changing anything, per the maintenance protocol, then implemented.
+
+`PAGE_SIZE` is now 50. To keep the embed count from doubling with it, `render()` no
+longer builds both layouts: it builds only the one matching the 768px breakpoint,
+includes the layout in the render signature, and rebuilds when the breakpoint is crossed.
+That takes a 50-song page from 100 iframes to 50.
+
+SD-3's other half is untouched: `src` is still blanked before any iframe is detached.
+
+Recorded as G-9, status `NEEDS FIELD TEST`. The original bug appeared at 40 constructed
+iframes, so 50 is above the level that once broke playback, and `loading="lazy"` was
+already in place then and did not help. Not deployed; awaiting a decision after testing.
+
+**R24. "billie eilish does not feature in sia's song 'the greatest'... what's happening
+here?" then "just rescrape again. also: add buy me a coffee widget, remove em dashes,
+button for random artist, other discover options?"**
+
+Diagnosed as B-15: two different songs merged because the dedup compared title and stream
+counts but never artist. Fixed with `shares_artist()`, verified on the exact case, and
+measured at 9,962 songs recovered. Rescrape started (resumable; the first attempt died
+because it was backgrounded inside a wrapper the harness tore down).
+
+Added a "Surprise me" random-artist button, uniform across the index so it reaches the
+long tail rather than reshuffling famous names. Smoke-tested over 40 clicks.
+
+Added a footer with attribution to kworb and a Buy Me a Coffee slot. The link is injected
+by `app.js` only when `BUYMEACOFFEE_USER` is set, which is deliberately empty, so the
+site cannot ship a dead donate link. Awaiting the handle.
+
+**Em dashes: declined, with reason.** The only five left in the project are inside real
+song titles rendered into generated pages: "We Contain Multitudes [em dash] piano reworks", "[em dash]star.",
+"[em dash] [DASH]". Editing them would falsify the data rather than fix the
+writing. The style rule applies to prose we author; every such instance is already gone.
+
+Discovery options beyond the random button were proposed rather than built.
+
+**R25. "related artists sounds like a great idea."**
+
+Built it from the artist's own shard rather than a new data file: a shard contains exactly
+the songs that artist appears on, which is precisely their co-occurrence universe.
+Verified to match `build_pages.py`'s whole-dataset computation byte for byte, so it costs
+no extra file and no extra request. Chips are capped at 12, filtered to names the index
+can resolve so none is a dead end, hidden for the global chart and when empty.
+
+An adversarial review of the same changes then **overturned the dedup fix from R24**.
+
+My `shares_artist()` gate rested on a premise I stated in a code comment and never
+tested: "every duplicate this pass exists to remove is the same song by the same artist".
+False. kworb lists a collaboration under a separate track ID on each artist's page, and
+`scrape.py` credits each record only with the artists whose page carried that URL. So
+Starboy exists twice, as `leads=["The Weeknd"]` and as `features=["Daft Punk"]`, with
+byte-identical stream counts and no name in common. The gate blocked exactly the merges
+it most needed to allow.
+
+Measured: my fix put **88 duplicate rows in the global top 1,000** where the original rule
+had 0. It was worse than no fix.
+
+Replaced with `should_merge()`: a shared artist **or** totals within 1%
+(`NEAR_IDENTICAL`). Near-identical totals are what actually separates "one recording
+counted twice" from "two songs sharing a title". Measured across candidate thresholds:
+
+| rule | songs | top-1000 duplicates |
+|---|---|---|
+| original | 321,878 | 0 |
+| shares_artist only | 331,840 | 88 |
+| shares OR within 1% | 323,152 | 0 |
+
+**R26. "make it 30 on mobile" + the Buy Me a Coffee widget script. Then "ok pushed".**
+
+Mobile was crashing: `PAGE_SIZE` 50 meant 50 Spotify embeds, `loading="lazy"` meant they
+all loaded by the time you reached the bottom, and a phone tab has orders of magnitude
+less memory than a desktop one, so the browser discarded and reloaded the tab. Desktop
+was unaffected throughout. `pageSize()` now returns 50 on desktop and 30 on mobile,
+resolved at render time and already covered by the breakpoint listener. 30 is below the
+40 that broke in March, but not proven safe; G-8's click-to-load embeds remain the
+durable fix.
+
+Swapped the hand-rolled footer link for BMC's official widget script, on the main app and
+on all generated artist pages, and removed the now-dead `support-slot` markup and
+`.support-link` styles. Recorded as G-11: this is the site's first third-party script.
+
+Then ran the full pipeline on the fresh scrape: 507,254 raw records to **323,251 songs**,
+19,708,233 bytes (75.2% of the 25 MiB cap). All four invariants verified before deploying:
+Starboy is one record crediting "The Weeknd, Daft Punk"; Sia and Billie Eilish are
+separate; the global top 1,000 has **0 duplicate rows**; comma artists intact with
+"Tyler, The Creator" at 195 and the fragments at 0.
+
+**R27. "it's tuesday, can you check if website updated successfully yesterday?"**
+
+Yes, and the week before too. Verified rather than assumed:
+
+- `github-actions[bot]` commits on Mon 3 Aug and Mon 10 Aug, each followed by a Cloudflare
+  deployment minutes later (03 Aug 09:08 UTC, 10 Aug 07:11 UTC).
+- Data is genuinely fresh: **all 200** of the top-200 songs increased since the 1 August
+  build. Blinding Lights 5,523,399,926 to 5,537,576,513.
+- Every invariant survived the unattended runs: Starboy is one record, the global top
+  1,000 has 0 duplicates, "Tyler, The Creator" resolves to 195 with fragments at 0.
+- SD-21 held: **0 slugs reassigned** across runs; the registry grew 2,998 to 3,009 by
+  appending 11 new artists.
+- The commit contains only `public/app.js` and `slugs.json`, per SD-19.
+
+One new finding, logged as G-12: 11 artists dropped out of the top 3,000, so their pages
+now 404. The sitemap correctly drops them, and their slugs stay reserved, but externally
+linked or already-indexed URLs are dead.
+
+**R28. "why is 'global chart (all artists)' only 1k songs?"**
+
+Question about SD-14, the user's own D1(c) choice from R16; answered rather than
+re-litigated. Two layers: product (uncapped means 6,465 pages at 50/page; the cap was
+chosen precisely so the surface stays a chart) and architecture (since R19 the browser
+never downloads the full dataset; the global surface is a precomputed `data/global.json`
+holding the top 1,000 **per sort**, 681 KB raw, and "all songs" would mean re-shipping
+the ~20 MB monolith the split deleted).
+
+Measured for the answer: the three sorts overlap far less than intuition suggests
+(totals vs popularity 0/1000, totals vs daily 584/1000), so the surface actually exposes
+2,371 distinct songs. Offered: raise the cap (cost is linear, ~680 KB per extra 1,000
+across the three sorts) or relabel the row so "(all artists)" stops reading as "all
+songs" (logged as G-13). No code changed.
+
+Also found and repaired a protocol gap: `ascii-requests.md` had no diagrams for R21 to
+R27. Same failure class as the R15 to R19 gap in this file. Backfilled.
+
+**R29. "Since we have 3 different sort options, lets just get the top 1k for each of
+those sort options (and don't display like for the other artists how many songs there
+are in the dropdown)."**
+
+The top-1k-per-sort behaviour already existed (SD-14; the cap is applied after sorting,
+so each sort ships its own set in `data/global.json`). The change was the dropdown: the
+global row no longer shows a song count, since "1,000 songs" described no real quantity.
+Artist rows keep their counts. G-13's count half is resolved; the label itself stays.
+
+**The turn's real work was what the request tripped over.** Local `data.json.gz` was
+from 1 August while CI had refreshed the live site on 10 August, so a naive
+`./deploy.sh` would have regressed the live data by nine days. Investigating that
+exposed worse: `cleanup.py` (the `should_merge()` dedup fix) and `build_pages.py` (the
+BMC widget) were **never committed**, so the 3 and 10 August CI runs used the old
+pipeline. Verified live: the Sia/Billie chimera is back (`6bLopGnirdrilrpdVB6Um1`
+credited "Sia, Billie Eilish" at 568,800,190 total with Billie's 302,997 daily; her own
+`6TGd66r0nlPaYm3KIoI7ET` gone), and artist pages lost the widget. B-19.
+
+Recovery, in order:
+1. Pulled origin (bot commits; local `slugs.json` verified a strict subset first, 0
+   mismatches, then discarded for origin's superset).
+2. **Reconstructed the 10 August dataset from the live shards themselves**: union of all
+   2,998 per-artist JSON files by URL, 322,541 songs. Fidelity proven three ways:
+   `make_preload.py` on the reconstruction reproduces the bot's PRELOAD byte for byte;
+   the rebuilt artist index is content-identical to live; the three global sorts match
+   as sets except one genuine tie at rank 1,000 (both songs at 604,377 daily). Also
+   recovers the 10 August time-series point (the 3 August one is lost; runner archives
+   died with the runner).
+3. Deployed: dropdown fix + widget restored to all artist pages + `data/meta.json`
+   vintage stamp. Data content unchanged (still carries the gate-less chimeras until a
+   fresh scrape runs through the fixed cleanup).
+4. Guards so neither failure recurs: `deploy.sh` now refuses to deploy local data older
+   than live (`--force` overrides); the CI sanity step asserts both "The Greatest"
+   track IDs survive as separate records, so a gate-less cleanup fails the run instead
+   of deploying; CI now uploads `data.json.gz` as a 90-day artifact, since the
+   runner-local snapshot archive was dying with the runner (G-14).
+
+The data heals on the next scrape through the fixed `cleanup.py`, which requires the
+pipeline fixes to be **committed and pushed** first. That is the user's action.
+
+**R25. Related artists; then the mobile crash report; then "make it 30 on desktop" plus
+the Buy Me a Coffee widget script.**
+
+**Related artists** built from the artist's own shard, which already contains exactly the
+songs they appear on, so it needs no new file and no extra request. Verified byte-identical
+to `build_pages.py`'s whole-dataset co-occurrence. Chips are capped at 12, filtered to
+names the index can resolve, hidden for the global chart and when empty.
+
+**The dedup fix from R24 was wrong and an adversarial review caught it before it
+shipped.** Its stated premise, that duplicates always share an artist, is false: kworb
+lists a collaboration under a separate track ID on each artist's page, and `scrape.py`
+credits each record only with the artists whose page carried that URL. Starboy therefore
+exists twice with byte-identical stream counts and disjoint names. Requiring a shared
+artist put **88 duplicate rows into the global top 1,000**, where the original rule had
+zero. Replaced with `should_merge()`: a shared artist **or** totals within 1%. Measured:
+323,152 songs and 0 duplicate rows, versus 321,878 and 0 for the original.
+
+**Mobile crash (B-16).** The user reported the live site reloading or erroring when
+scrolling to the bottom, on phone only. Cause: `PAGE_SIZE` 50 put 50 Spotify embeds on a
+page, each a full nested browsing context; `loading="lazy"` merely deferred them until
+the scroll reached the bottom, at which point the tab exceeded its memory and the browser
+discarded it. Exactly the SD-3 failure mode flagged as untested in R23. Fixed with a
+per-device page size, now 30 on both, below the 40 that broke in March.
+
+**`scrape.py` exit-code bug.** The 3,000-artist scrape completed and wrote `data.json`,
+then exited 1 on an unguarded `os.remove(PROGRESS_FILE)` because a resumed run finds the
+file already gone. That would have failed the weekly workflow on every resumed run.
+Guarded.
+
+**Buy Me a Coffee** switched from a hand-rolled footer link to the official widget script
+supplied by the user. This is now the only third-party JavaScript on the site.
+
+Refreshed artifact: 507,254 raw to **323,251 songs**, 19,708,233 bytes (75% of the cap).
+All nine invariants pass: Starboy merged and credited to both artists, Billie Eilish's
+"THE GREATEST" restored as its own record, comma names intact, zero duplicate rows in the
+global top 1,000.

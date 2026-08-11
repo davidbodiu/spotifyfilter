@@ -277,6 +277,70 @@ now rewrites the tag.
 
 ## Gaps
 
+### B-19. CI ran a stale pipeline: the dedup fix and widget were never committed `OPEN` `HIGH`
+
+Found 11 August (R29). `should_merge()` in `cleanup.py` and the BMC widget in
+`build_pages.py` existed only in the local working tree; the user's 1 August commits
+did not include them. The 3 and 10 August CI runs therefore scraped fresh data and
+cleaned it with the **gate-less** dedup: the Sia/Billie chimera class (~10k wrong
+merges) is back in the live data, and artist pages shipped without the widget.
+
+The widget is already re-fixed live (R29's deploy rebuilds pages locally, where the
+code is current). The data cannot be repaired locally: the chimera merges are lossy and
+the raw 10 August scrape died with the runner. It heals on the next scrape through the
+fixed cleanup, and stays healed only if the fixes are committed.
+
+**Two guards added so this class dies:** the CI sanity step now asserts both "The
+Greatest" track IDs survive as separate records (a gate-less cleanup fails the run
+before deploying), and `deploy.sh` refuses to ship local data older than live
+(`data/meta.json` vintage stamp, `--force` to override).
+
+**Blocked on: committing `cleanup.py`, `build_pages.py`, `scrape.py`,
+`.github/workflows/refresh-data.yml`, `deploy.sh`, `public/app.js`.**
+
+### G-14. CI's snapshot archive died with the runner `FIXED`
+
+The workflow's "Archive the outgoing artifact" step copied `data.json.gz` into
+`snapshots/` on the runner's ephemeral disk, which is discarded when the job ends. Every
+CI-era time-series point was silently lost (3 August is gone for good; 10 August was
+recovered in R29 by reconstructing from the live shards). Fixed: the dataset is now
+uploaded as a GitHub Actions artifact with 90-day retention.
+
+### G-13. "Global chart (all artists)" label over-promises `OPEN` `TRIVIAL`
+
+The dropdown row reads "Global chart (all artists)", where "(all artists)" means scope
+across artists, but a reasonable reading is "all songs". It surfaced as a user question
+in R28. The results line does disclose "of the top 1,000 songs by <sort>", but only
+after selection. Cheapest fix: relabel to "Global Top 1,000". One string in `app.js`
+(`GLOBAL_LABEL`).
+
+**Half resolved in R29:** the misleading "1,000 songs" count no longer renders on the
+global dropdown row (user request). The label itself is unchanged.
+
+### G-12. Artist churn silently 404s previously-indexed pages `OPEN` `LOW`
+
+Found 11 August 2026 while verifying the first automated refreshes. Between the 1 August
+and 10 August runs, 11 artists fell out of kworb's top 3,000 (Common, Jazmine Sullivan,
+Ivy Queen, Julien Baker, Dinos, FAST BOY and others). `build_pages.py` only generates
+pages for artists present in the current data, so their URLs now return **404**.
+
+The sitemap is regenerated each run and correctly drops them, so nothing points at a dead
+URL from inside the site. But anything Google had already indexed, or any external link,
+now hits a 404.
+
+Rate is about 11 per 3,000 per week, roughly 0.4%. Practically harmless today because the
+site has little or no index presence yet, and many artists churn back in. It compounds
+only if the site starts ranking.
+
+`slugs.json` is append-only (SD-21) and retains the dropped names, so their slugs are
+reserved and a returning artist gets the same URL back. That is the important half.
+
+Options if it ever matters: keep generating a page from last-known data (stale numbers,
+stable URL), 301 the dropped slugs to `/artists/`, or accept it as inherent to a
+top-3,000 snapshot.
+
+
+
 ### G-1. Sort requires clicking Apply `OPEN` `MEDIUM`
 
 There is no `change` listener on `#sort-select`; only `#apply-btn` calls `applyFilters()`
@@ -492,6 +556,110 @@ Two findings worth keeping: `assets.directory: "."` would upload the 106 MB `dat
 and blow the 25 MiB cap, and `.assetsignore` does **not** filter on wrangler 4.118,
 verified with an isolated test where adding it increased the file count.
 
+### B-16. 50 embeds per page crashed mobile browsers `FIXED`
+
+Reported live: scrolling to the bottom reloaded the page or showed an error, on phone
+only. `PAGE_SIZE` 50 meant 50 Spotify embeds per page, each a full nested browsing
+context with ~13 scripts, its own runtime and an audio context. `loading="lazy"` did not
+prevent this, it only deferred it: reaching the bottom loaded all 50 at once, exhausted
+the tab's memory and made the browser discard and reload it. Desktop has orders of
+magnitude more headroom, which is why it only appeared on mobile.
+
+This is SD-3's original failure mode, which appeared at 40 constructed iframes in March.
+R23 flagged 50 as above that line and untested; the field test failed.
+
+Fixed with a per-device page size (`PAGE_SIZE_DESKTOP` / `PAGE_SIZE_MOBILE`, both 30),
+resolved through the existing `mobileQuery`. The split is retained so mobile can be
+lowered independently. The durable fix remains G-8: load embeds on tap, which makes any
+page size safe.
+
+### B-17. A successful scrape exited non-zero `FIXED`
+
+`scrape.py` finished all 3,000 artists and wrote `data.json`, then raised
+`FileNotFoundError` on `os.remove(PROGRESS_FILE)`: a resumed run can find the progress
+file already deleted. Exit code 1 on a completely successful scrape would have failed the
+weekly workflow at the first step, discarding an hour of work. Now guarded.
+
+### B-15. Dedup merged different songs that shared a title `SUPERSEDED by B-18`
+
+Reported by the user from a live row: "The Greatest" credited to "Sia, Billie Eilish",
+showing 565.7M total and 330.5K daily. Billie Eilish does not appear on Sia's track.
+
+Two genuinely different songs were merged. `normalize_title()` folds case, so Sia's
+"The Greatest" and Billie Eilish's "THE GREATEST" collided, and their totals sit 1.765%
+apart (ratio 0.98235) against a 2% tolerance. The surviving record took Sia's title,
+Sia's URL and Sia's total, but **Billie's daily count**, credited to both. Billie's track
+`6TGd66r0nlPaYm3KIoI7ET` disappeared from the dataset entirely and Sia's track appeared
+on Billie's artist page.
+
+**Root cause:** the cluster test asked only "same normalized title?" and "streams within
+2%?". It never asked whether the two records had any artist in common.
+
+**Fix:** `shares_artist()` gates every merge. Every duplicate this pass exists to remove
+(regional release, deluxe edition, re-release) is the same song by the same artist and
+therefore always shares a name; two artists' unrelated songs never do.
+
+Measured against the raw snapshot: **9,962 songs recovered**, 321,878 to 331,840, about
+3% of the catalogue. Verified on the exact case: 2 records in, 2 records out, each
+keeping its own counts.
+
+Not yet visible on the site. The damage is baked into the shipped artifact, so it needs
+the rescrape currently running.
+
+### G-11. Buy Me a Coffee widget is the first third-party script on the site `OPEN` `LOW`
+
+R25 replaced the hand-rolled footer link with BMC's official widget
+(`cdnjs.buymeacoffee.com/1.0.0/widget.prod.min.js`), on the main app and on all 2,998
+generated artist pages.
+
+Worth knowing: this is the only third-party JavaScript the site loads, so it is the only
+thing that can set cookies, be blocked by an ad blocker, or slow first paint from an
+origin outside our control. `data-cfasync="false"` stops Cloudflare Rocket Loader
+deferring it. If it ever needs removing, it is one line in `index.html` and one constant
+in `build_pages.py`.
+
+### G-10. Discovery is limited to knowing an artist's name `PARTIAL`
+
+Until now the only way in was typing a name you already knew, which makes the long tail
+of ~2,998 artists unreachable. Added a "Surprise me" button picking uniformly across the
+whole index, so obscure artists surface as often as famous ones. Further options are
+open; see R24.
+
+### G-9. PAGE_SIZE raised to 50 `FIELD TEST FAILED ON MOBILE, NOW PER-DEVICE`
+
+Requested in R23. SD-3 pinned `PAGE_SIZE` at 10 because Spotify embeds stopped playing
+after a few page changes (R5.2, 28 March; the user's own commit message names the
+symptom). The other half of that fix, blanking `src` before removal, is untouched.
+
+Mitigation shipped alongside: `render()` built both the desktop table and the mobile
+cards on every render and let CSS hide one, so half of every page's embeds were
+constructed invisibly. It now builds only the layout matching the breakpoint, with the
+layout included in the render signature and a `matchMedia` listener forcing a rebuild
+when the breakpoint is crossed. Verified: 50 table rows and 0 cards on desktop, the
+reverse on mobile.
+
+Net effect per page render: 20 iframes before, 100 if raised naively, **50 as shipped**.
+
+**Residual risk is real and unverified.** The March bug appeared at 40 constructed
+iframes (`PAGE_SIZE` 20, both layouts built), and 50 is above that. `loading="lazy"` was
+already present in March and did not prevent it. This needs a field test: page through
+five or six pages with a track playing and see whether audio survives.
+
+**The field test failed, on mobile only (R25).** Scrolling to the bottom of a 50-row page
+made the browser discard and reload the tab, or show its error page. `loading="lazy"`
+means the embeds load as you scroll, so reaching the bottom is exactly when all 50 are
+live at once. Each is a nested browsing context pulling ~13 scripts, 3 stylesheets,
+artwork, its own JS runtime and an audio context. A phone tab has a few hundred MB; a
+desktop tab has gigabytes, which is why desktop never showed it.
+
+**Now per-device**: `PAGE_SIZE_DESKTOP = 50`, `PAGE_SIZE_MOBILE = 30`, resolved at render
+time through `pageSize()` and already covered by the existing breakpoint listener.
+Verified: desktop renders 50 table rows and 0 cards, mobile renders 0 rows and 30 cards.
+
+**30 is not proven safe, only safer.** March broke at 40 constructed iframes, so 30 is
+below that line but not by much. If phones still struggle, the fix is G-8's click-to-load
+embeds, which removes the ceiling entirely rather than staying under it.
+
 ### G-8. Spotify embeds are dark-only, and there are two per row `WONTFIX` (embed) / `OPEN` (double build)
 
 The user reports the preview cards stay dark in light mode. Verified directly against
@@ -552,6 +720,46 @@ poison every delta.
 
 The older v1 copy at `../projects/spotify filter/spotify_filter_v1/data.json` still
 exists, 96,959,673 bytes, dated 28 March.
+
+### I-8. Never commit a pre-compressed artifact to git `NEW`
+
+Git stores a new revision of a file as a delta against the previous one. That works on
+plain text and fails completely on anything already compressed: change one byte of the
+source and the entire gzip stream differs, so git stores a full fresh blob every time.
+
+`data.json.gz` is the case in point. Committed weekly it would cost 18.7 MB per commit,
+against 15.4 MB for the same data as uncompressed shards that are 7.6x larger on disk.
+The bigger artifact is the cheaper one to version.
+
+Rule: commit the uncompressed form and let git compress it, or keep the artifact out of
+the repo. This applies to any `.gz`, `.zip`, PNG, PDF or minified bundle.
+
+### I-7. Repo growth is governed by "commit or not", barely by "split or not" `NEW`
+
+Two independent decisions were conflated when the split shipped. Measured 1 August 2026:
+
+| | Commit it | Do not commit it |
+|---|---|---|
+| Monolith, 18.7 MB gzip | 0.95 GB/year | ~0 |
+| Sharded tree, 142 MB raw | **0.78 GB/year** | ~0 |
+
+Sharding is genuinely ~18% cheaper *if committed*, because git delta-compresses plain
+text between revisions but cannot delta a gzip stream at all: any change rewrites the
+whole compressed blob. Measured on a 200-artist sample committed twice with stream
+numbers nudged, scaled to 2,998 artists.
+
+But the column dominates the row by three orders of magnitude. Actual weekly cost under
+SD-19 is **0.5 KiB**, measured over four simulated weeks, because only `public/app.js`
+and `slugs.json` are staged.
+
+Two earlier figures in this file and in chat were overstated and are corrected here:
+"~8 GB/year" came from multiplying a `du` figure by 52 and ignoring that git zlib-
+compresses blobs; the follow-up "~1.6 GB/year" ignored delta compression. The measured
+figure is 0.78 GB/year.
+
+Splitting was chosen for load time (45 KB index plus a 7 KB shard instead of 18.7 MB),
+the 25 MiB per-file ceiling, and 3,000 indexable URLs. Storage was never the reason, and
+splitting in fact makes the data 7.6x larger on disk.
 
 ### I-6. Brand green cannot be used for text `NEW`
 

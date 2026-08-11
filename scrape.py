@@ -261,9 +261,14 @@ def main():
         json.dump(output, f)
     print(f"Written to {OUTPUT_FILE}")
 
-    # Clean up progress file
-    os.remove(PROGRESS_FILE)
-    print("Done! Progress file cleaned up.")
+    # Clean up progress file. Guarded: a resumed run can find it already gone, and an
+    # unguarded remove() made a fully successful 3,000-artist scrape exit non-zero,
+    # which would fail the weekly workflow despite data.json being written correctly.
+    try:
+        os.remove(PROGRESS_FILE)
+        print("Done! Progress file cleaned up.")
+    except FileNotFoundError:
+        print("Done! (progress file already removed)")
 
 
 if __name__ == "__main__":

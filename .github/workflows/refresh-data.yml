@@ -107,8 +107,29 @@ jobs:
               sys.exit("FAIL: 'Tyler, The Creator' is absent. Artist splitting has regressed.")
           if "tyler" in keys or "the creator" in keys:
               sys.exit("FAIL: comma-split artist fragments are back.")
-          print("shape and SD-13 invariants OK")
+
+          # B-15/B-18 chimera class: Sia's "The Greatest" and Billie Eilish's
+          # "THE GREATEST" are different songs whose totals sit inside the 2%
+          # dedup tolerance. Both track IDs must survive as separate records; a
+          # merge here means cleanup.py lost its should_merge() gate.
+          urls = {s["url"].rsplit("/", 1)[-1] for s in songs}
+          for tid, who in [("6bLopGnirdrilrpdVB6Um1", "Sia"),
+                           ("6TGd66r0nlPaYm3KIoI7ET", "Billie Eilish")]:
+              if tid not in urls:
+                  sys.exit(f"FAIL: {who}'s 'The Greatest' ({tid}) is missing: "
+                           "different-artist songs are being merged again.")
+          print("shape, SD-13 and dedup invariants OK")
           EOF
+
+      - name: Archive datasets off the runner
+        # The snapshots/ copy made earlier dies with the runner. Artifacts survive 90
+        # days, which is what makes week-over-week stream deltas possible at all.
+        uses: actions/upload-artifact@v4
+        with:
+          name: dataset-${{ github.run_id }}
+          path: |
+            data.json.gz
+          retention-days: 90
 
       - name: Build the generated surface
         # Artist pages, per-artist shards, global chart and sitemap. Not committed

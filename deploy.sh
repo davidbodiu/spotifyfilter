@@ -15,6 +15,24 @@ CAP=26214400   # 25 MiB, Cloudflare's per-file asset limit
   exit 1
 }
 
+# Freshness guard. CI refreshes the live data weekly on the runner, so the local
+# data.json.gz goes stale in between; deploying it would silently regress the live
+# site to older numbers. Compare data vintage (file mtime, stamped into
+# data/meta.json by build_pages.py) against what is live. --force overrides.
+FORCE=0
+if [ "${1:-}" = "--force" ]; then FORCE=1; shift; fi
+if [ "$FORCE" = "0" ]; then
+  LIVE_EPOCH=$(curl -s --max-time 15 -A "Mozilla/5.0 (Macintosh) Chrome/131" \
+    "https://chartrank.app/data/meta.json?cb=$RANDOM" \
+    | python3 -c "import json,sys; print(json.load(sys.stdin).get('dataEpoch',0))" 2>/dev/null || echo 0)
+  LOCAL_EPOCH=$(python3 -c "import os; print(int(os.path.getmtime('data.json.gz')))")
+  if [ "$LIVE_EPOCH" -gt "$LOCAL_EPOCH" ]; then
+    echo "ERROR: local data.json.gz ($(date -r "$LOCAL_EPOCH" '+%Y-%m-%d' 2>/dev/null || echo "$LOCAL_EPOCH")) is OLDER than the live data ($(date -r "$LIVE_EPOCH" '+%Y-%m-%d' 2>/dev/null || echo "$LIVE_EPOCH"))." >&2
+    echo "Deploying would regress the live site. Rescrape, or ./deploy.sh --force to override." >&2
+    exit 1
+  fi
+fi
+
 echo "Building generated pages..."
 python3 build_pages.py
 python3 make_preload.py

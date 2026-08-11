@@ -239,8 +239,10 @@ by daily, 198 ms by popularity. Roughly 3 to 4x that on mobile, paid once per Ap
 rather than per render.
 
 The dropdown carries a synthetic first row for it while the query is two characters or
-fewer, or when the text plainly matches. `selectedArtist` holds the key,
-`selectedLabel` holds the display text; they diverge only for this surface.
+fewer, or when the text plainly matches. The row shows **no song count** (R29): the
+surface is the top 1,000 per sort, largely different sets per sort, so no single number
+describes it. `selectedArtist` holds the key, `selectedLabel` holds the display text;
+they diverge only for this surface.
 
 ### Theming (SD-15, SD-16)
 
@@ -377,7 +379,23 @@ wiring the filter logic back into `applyFilters()`.
 ```bash
 ./deploy.sh              # build the generated surface, then publish public/
 ./deploy.sh --dry-run    # build and validate without publishing
+./deploy.sh --force      # bypass the data-freshness guard
 ```
+
+**Freshness guard:** CI refreshes the live data weekly on a runner, so the local
+`data.json.gz` goes stale in between, and a naive local deploy would regress the live
+site to older numbers (nearly happened in R29). `build_pages.py` stamps the data's file
+mtime into `data/meta.json`; `deploy.sh` compares it against the live copy and aborts
+if local is older. Fail-open when the live stamp is unreachable.
+
+**The pipeline only runs what is committed.** CI executes `cleanup.py` and
+`build_pages.py` from the repo, not from anyone's working tree. Uncommitted fixes do
+not exist as far as the weekly refresh is concerned; that is how the dedup fix and the
+widget silently reverted in the 3 and 10 August runs (B-19). After changing pipeline
+code, commit and push it, or the next scheduled run undoes the behaviour.
+
+CI also uploads each week's `data.json.gz` as a GitHub Actions artifact (90-day
+retention), because the runner-local `snapshots/` copy dies with the runner.
 
 `deploy.sh` runs `build_pages.py` and `make_preload.py` first, because the generated
 surface is not committed (SD-19), then gates on the 25 MiB per-file cap and the 20,000

@@ -38,6 +38,11 @@ SONGS_ON_PAGE = 50      # rendered as text for crawlers; the app fetches the ful
 GLOBAL_CAP = 1000       # must match GLOBAL_CAP in app.js
 SORTS = ("totalStreams", "dailyStreams", "popularity")
 
+# Same floating widget as the main app, so it appears on the SEO landing pages too.
+BMC_WIDGET = (
+    '<script data-name="BMC-Widget" data-cfasync="false" src="https://cdnjs.buymeacoffee.com/1.0.0/widget.prod.min.js" data-id="david2000" data-description="Support me on Buy me a coffee!" data-message="" data-color="#40DCA5" data-position="Right" data-x_margin="18" data-y_margin="18"></script>'
+)
+
 
 def slugify(name):
     """URL slug for an artist name. May collide or come back empty; callers resolve."""
@@ -173,6 +178,7 @@ def page_html(name, slug, songs, collaborators):
 
   {f'<p class="page-lede">Often appears with: {links}</p>' if links else ''}
 </div>
+{BMC_WIDGET}
 </body>
 </html>
 """
@@ -230,6 +236,16 @@ def main():
     index.sort(key=lambda e: -e["c"])
     with open(f"{OUT}/data/artists.json", "w", encoding="utf-8") as f:
         json.dump(index, f, ensure_ascii=False, separators=(",", ":"))
+
+    # Data-vintage stamp, read by deploy.sh. The mtime of data.json.gz is the marker:
+    # a stale local pipeline keeps an old mtime, so deploying it over fresher live data
+    # can be caught before it happens (that exact regression shipped once, R29).
+    meta = {
+        "songs": len(songs),
+        "dataEpoch": int(os.path.getmtime(DATA)),
+    }
+    with open(f"{OUT}/data/meta.json", "w", encoding="utf-8") as f:
+        json.dump(meta, f)
 
     # Global chart: the top N by each sort are different sets, so precompute all three.
     glob = {}
