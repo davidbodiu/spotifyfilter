@@ -40,6 +40,7 @@ silently.
 | SD-20 | The Cloudflare **Workers Builds git integration must stay disabled**. Deploys come from `deploy.sh` or CI. | R19 | It only sees the repo, which by SD-19 has no data. It would publish a broken site on every push. |
 | SD-21 | `slugs.json` is append-only. A name's slug is never reassigned. | R19 | A changed slug destroys its own URL, backlinks and rankings. |
 | SD-22 | Spotify embeds are left exactly as they are, dark in both themes. | R19 | Verified: no light embed exists. User chose to leave it. |
+| SD-23 | The global **popularity** chart only ranks songs with >= 400k daily streams (`POP_MIN_DAILY`). Other sorts and per-artist views are unfiltered. | R31 | popularity = daily/total explodes near the 1M total floor; user chose a daily floor over a total floor or damped ratio. |
 
 ---
 
@@ -731,7 +732,39 @@ Recovery, in order:
    runner-local snapshot archive was dying with the runner (G-14).
 
 The data heals on the next scrape through the fixed `cleanup.py`, which requires the
-pipeline fixes to be **committed and pushed** first. That is the user's action.
+pipeline fixes to be **committed and pushed** first.
+
+**User authorized the commit.** Pushed as `a5ff344` (10 files, +724/-12): pipeline fixes,
+guards, workflow changes, dropdown edit, and docs R21 to R29. B-19 unblocks; the data
+heals on the next scheduled run (Monday 04:10 UTC) or a manual workflow dispatch.
+
+**R30. "For the results from the popularity filter on the global artists, should we add
+a minimum number of daily streams eg 400k? or what would be recommended?"**
+
+Measured before opining. The noise is the denominator, not the numerator: at the SD-5
+floor (1M total), popularity equals dailyStreams, so the global popularity chart is
+dominated by whatever just crossed 1M total (703/1000 rows under 5M total; the top is
+live-album re-releases with 180 to 300k daily). Consequently a daily floor below ~200k
+does not change the top at all, and at the user's proposed 400k only 1,935 songs
+qualify, making the chart 55% identical to the daily chart. Alternatives measured: a
+total-streams floor (>= 20M: clean "surging new hits" top, Ariana Grande album tracks)
+and a damped ratio daily/(total+K) (smooth, but the client re-sorts global rows by raw
+popularity, so it needs an app.js change to respect server order). Options presented per
+SD-12 with numbers and code; recommendation held until the user chooses. Logged as R-6.
+
+**R31. "let's implement A"**
+
+Implemented the user's choice: `POP_MIN_DAILY = 400_000` in `build_pages.py`, applied
+only to the global popularity pool before sorting. Per SD-12 the held recommendation was
+stated after the choice (B, for distinctness from the daily chart) in one line, then A
+built as asked. No `app.js` change needed: the client re-sort uses the same key over the
+same pool, so server order is preserved.
+
+Verified rebuilt and live: 1,000 rows, minimum daily 400,051, ordered by popularity,
+top = 'Te Estoy Correteando' / LATIN MAFIA; overlap with the daily chart 551/1000
+exactly as measured in R30; totalStreams and dailyStreams charts byte-order unchanged.
+Deployed as `16de7573`. Recorded as SD-23; committed and pushed so Monday's CI run
+builds with the floor (the B-19 failure class).
 
 **R25. Related artists; then the mobile crash report; then "make it 30 on desktop" plus
 the Buy Me a Coffee widget script.**

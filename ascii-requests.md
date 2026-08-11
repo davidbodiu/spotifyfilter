@@ -582,3 +582,38 @@ Updated after every request. See the maintenance protocol in `CLAUDE.md`.
         |
   (( data heals on next scrape IF the pipeline fixes get committed (B-19) ))
 ```
+
+## R30, 11 August: "minimum daily streams for global popularity? eg 400k?"
+
+```
+  (( proposal: floor the NUMERATOR ))
+        |
+        [ measure the actual top ] --> 703/1000 rows under 5M total
+        !!! at the 1M floor, popularity == dailyStreams: the chart ranks
+        !!!   "just crossed the threshold", not "hot"
+        |
+        [ test floors ] --> daily < 200k: top unchanged
+        |                   daily 400k: 1,935 qualifiers, 55% = daily chart
+        |                   total >= 20M: clean surging-hits top
+        |                   damped daily/(total+K): smooth, needs client change
+        |
+        [ options + numbers presented, recommendation held ]   *** SD-12
+        |
+  (( awaiting choice, R-6 ))
+```
+
+## R31, 11 August: "let's implement A"
+
+```
+  (( choice made with the numbers on the table ))
+        |
+        [ held recommendation stated after the choice (B), then A built ]  *** SD-12
+        |
+        [ POP_MIN_DAILY = 400_000 in build_pages.py, popularity pool only ]
+        |    client re-sort: same key, same pool -> server order preserved
+        |
+        [ rebuild ] --> min daily 400,051; other sorts byte-order unchanged
+        [ deploy 16de7573 ] [ verify live ] [ commit + push ]   *** SD-23
+        |
+  (( global popularity now floors at 400k daily ))
+```

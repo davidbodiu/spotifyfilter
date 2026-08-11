@@ -456,6 +456,26 @@ directly" convention. It does mean thousands of small files in the repo.
 Worth doing only if load time is a real complaint. Flagging as an option, not a
 recommendation to act on now.
 
+### R-6. Global popularity chart ranks denominator noise `RESOLVED` (option A)
+
+Raised by the user in R30. `popularity = daily/total * 1e6` explodes when the
+denominator is tiny: at total = 1M (the SD-5 floor), popularity equals dailyStreams
+numerically. Measured on the 10-Aug data: **703 of the global popularity top-1000 have
+under 5M total streams**, median daily in that "hot" chart is 83k, and the top is
+live-album re-releases (TOTO, Winehouse) that just crossed the floor.
+
+Candidate fixes measured (see R30 in requests.md for full numbers): a daily-streams
+floor only bites at ~400k, where just 1,935 songs qualify and the chart becomes 55%
+identical to the daily chart; a total-streams floor (>= 20M) yields a clean
+new-hits-surging chart (Ariana Grande's new album tracks); a damped ratio
+`daily/(total+K)` at K = 10 to 50M is smoothest but needs the client to stop re-sorting
+the global rows.
+
+**DECIDED R31: option A, `POP_MIN_DAILY = 400_000` (SD-23).** The user chose the daily
+floor with the measured trade-off on the table (551/1000 overlap with the daily chart;
+only 1,935 songs qualify). Live and verified. If the chart ever feels redundant next to
+the daily sort, the recorded alternatives are the total floor and the damped ratio.
+
 ### R-4. `merge_artists()` substring absorption may over-merge `MITIGATED` `UNVERIFIED`
 
 `add_deduped()` in [cleanup.py:73-85](cleanup.py#L73-L85) drops any name that is a

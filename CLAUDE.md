@@ -238,6 +238,11 @@ Measured on 321,878 songs: 8 ms by total streams (the data ships in that order),
 by daily, 198 ms by popularity. Roughly 3 to 4x that on mobile, paid once per Apply
 rather than per render.
 
+**The popularity sort is floored** (SD-23): only songs with >= 400k daily streams
+(`POP_MIN_DAILY` in `build_pages.py`) enter the global popularity pool, because
+daily/total explodes near the 1M total floor and the unfiltered chart ranked
+just-crossed-the-threshold re-releases. Applies to the global chart only.
+
 The dropdown carries a synthetic first row for it while the query is two characters or
 fewer, or when the text plainly matches. The row shows **no song count** (R29): the
 surface is the top 1,000 per sort, largely different sets per sort, so no single number

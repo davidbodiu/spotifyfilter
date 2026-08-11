@@ -36,6 +36,12 @@ SITE = "https://chartrank.app"
 
 SONGS_ON_PAGE = 50      # rendered as text for crawlers; the app fetches the full shard
 GLOBAL_CAP = 1000       # must match GLOBAL_CAP in app.js
+POP_MIN_DAILY = 400_000  # global POPULARITY chart only (SD-23, R31). popularity is
+                         # daily/total, which explodes near the 1M total floor: 703 of
+                         # the unfiltered top-1000 had under 5M total. Chosen by the
+                         # user over a total-streams floor or a damped ratio; ~1,935
+                         # songs qualify, so this chart intentionally overlaps the
+                         # daily chart heavily. Per-artist sorting is untouched.
 SORTS = ("totalStreams", "dailyStreams", "popularity")
 
 # Same floating widget as the main app, so it appears on the SEO landing pages too.
@@ -250,7 +256,10 @@ def main():
     # Global chart: the top N by each sort are different sets, so precompute all three.
     glob = {}
     for key in SORTS:
-        glob[key] = sorted(songs, key=lambda s: -s.get(key, 0))[:GLOBAL_CAP]
+        pool = songs
+        if key == "popularity":
+            pool = [s for s in songs if s["dailyStreams"] >= POP_MIN_DAILY]
+        glob[key] = sorted(pool, key=lambda s: -s.get(key, 0))[:GLOBAL_CAP]
     with open(f"{OUT}/data/global.json", "w", encoding="utf-8") as f:
         json.dump(glob, f, ensure_ascii=False, separators=(",", ":"))
 
