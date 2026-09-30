@@ -47,12 +47,17 @@ Open items in `MISC.md` that warrant this treatment are tagged `DECISION`.
 ## Pipeline
 
 ```
-scrape.py  →  data.json (~106 MB)  →  cleanup.py  →  data.json.gz (~19.6 MB)
-                                                          ↓
-                                                   build_pages.py
-                                                          ↓
+scrape.py  →  data.json (~106 MB)  →  release_dates.py  →  release_dates.txt (committed)
+                                             ↓                      ↓
+                                        cleanup.py  ←───────────────┘
+                                             ↓
+                                      data.json.gz (~20 MB)
+                                             ↓
+                                      build_pages.py
+                                             ↓
    public/data/artists.json (45 KB gz)  +  public/data/artist/<slug>.json (~7 KB each)
    public/data/global.json              +  public/artist/<slug>/index.html x 2,998
+   public/data/new.json                 +  public/new/index.html
    public/sitemap.xml                   +  public/artists/index.html
 ```
 
@@ -64,7 +69,8 @@ copy reclaims nothing because git keeps every blob it has ever seen.
 The browser never downloads the monolith. It fetches `data/artists.json` (45 KB gzipped)
 and then one artist shard (~7 KB). `data.json.gz` exists only to feed `build_pages.py`.
 
-Committed: the hand-written files in `public/`, the Python pipeline, and `slugs.json`.
+Committed: the hand-written files in `public/`, the Python pipeline, `slugs.json`, and
+`release_dates.txt` (the append-only track ID to release date registry, SD-24).
 
 ## Dataset facts
 
@@ -113,7 +119,8 @@ Each record in `data.json.gz`:
   "totalStreams": 1843201955,
   "dailyStreams": 812004,
   "url": "https://open.spotify.com/track/5hVghJ4KaYES3BFUATCYn0",
-  "popularity": 440.6
+  "popularity": 440.6,
+  "releaseDate": "2019-05-17"
 }
 ```
 
@@ -125,6 +132,13 @@ Each record in `data.json.gz`:
 - `popularity` is `dailyStreams / totalStreams * 1,000,000`, rounded to 1 decimal. It is a
   momentum measure: high for new releases, low for back catalogue. Added by `cleanup.py`,
   not by the scraper.
+- `releaseDate` is the date Spotify attaches to the track, which is the **album's**
+  release date of the canonical version, as `YYYY-MM-DD`. A single folded into a later
+  album carries the album's date, not its own. For a merged cluster it is the earliest
+  date among the dated members. **Omitted, not
+  null, when unknown**: the registry has not reached that ID yet, or Spotify has no
+  date for it (recorded as `-` in `release_dates.txt`). Added by `cleanup.py` from the
+  registry, never fetched at build time.
 
 `leads` and `features` were added on 31 July 2026 and are live in the shipped artifact.
 Archived snapshots taken before that date have only `artist`, which is why the frontend
@@ -155,9 +169,45 @@ success. Re-running after an interruption skips completed artists by name.
 **Politeness:** `REQUEST_DELAY = 0.75s` between requests, `MAX_RETRIES = 3` with
 exponential backoff (`RETRY_BACKOFF = 2`), desktop User-Agent header.
 
+## `release_dates.py`
+
+Sits between the scrape and the cleanup. For every raw record at or above
+`MIN_TOTAL_STREAMS` whose track ID is not yet in `release_dates.txt`, it fetches the
+Spotify **embed page** (`open.spotify.com/embed/track/<id>`, the same document every
+row of the app loads as an iframe) and reads `releaseDate.isoString` out of its inlined
+`__NEXT_DATA__` JSON. Appends `<id> <YYYY-MM-DD>` lines to the registry; `-` marks an
+ID Spotify has no date for, so it is never refetched.
+
+Why the embed page and not the Web API (R33, 30 September 2026): Development Mode now
+requires a Premium subscription, the batch `GET /tracks` endpoint was removed in
+February 2026 and the Client Credentials flow is being retired for metadata, so the API
+would cost one request per track anyway plus a secret in CI. kworb has no release
+date on any page the scraper visits; its per-track page only has chart-entry dates.
+
+**The page is undocumented.** `parse_date()` is the only function that knows its
+shape, and a run fails with a clear message if fewer than `MIN_PARSE_RATE` (80%) of the
+pages carried a date. In CI that step is `continue-on-error`: a broken fetch must not
+block the stream refresh, since `cleanup.py` still reads last week's registry.
+
+**Rate limit, measured:** a burst at ~9/s drew 429s after ~190 requests and cleared
+in about a minute; 2/s sustained drew none over 300 requests. `PACE` (2.0/s) bounds the
+rate across all workers and any 429 pauses every worker for `Retry-After` or 60 s.
+
+**Fetch order is popularity descending** (daily/total), so a run cut short by
+`MAX_FETCHES` (5,000 per CI run, ~42 min) still covers every plausible new release
+first. A song a few days old has a ratio no back-catalogue track can reach. The cold
+backfill of ~330k IDs runs locally with `RELEASE_DATES_MAX=400000` (about two days at
+2/s); CI's bounded runs continue whatever is left.
+
+**The registry is append-only and committed**, for the same reason as `slugs.json`: a
+date never changes, the backfill is ~330k requests, and CI runners keep nothing
+between runs. Plain text rather than gzip so git stores each week's commit as a small
+delta instead of a fresh binary blob.
+
 ## `cleanup.py`
 
-Post-scrape pass. Reads `data.json`, writes `data.json.gz` at compression level 9.
+Post-scrape pass. Reads `data.json` and `release_dates.txt`, writes `data.json.gz` at
+compression level 9.
 
 1. **Encoding fix.** `fix_encoding()` repairs mojibake by round-tripping `latin-1` to
    `utf-8`. Falls back to the original string on failure.
@@ -169,6 +219,9 @@ Post-scrape pass. Reads `data.json`, writes `data.json.gz` at compression level 
    "Macklemore & Ryan Lewis".
 3. **Popularity score.** As above.
 4. **Threshold filter.** Drops anything below `MIN_TOTAL_STREAMS = 1_000_000`.
+5. **Release date.** Looks up every member URL of a merged cluster (tracked in a
+   transient `_urls` list during the merge) in the registry and keeps the earliest.
+   Records with no hit get no field.
 
 Output is sorted by `totalStreams` descending.
 
@@ -249,6 +302,43 @@ surface is the top 1,000 per sort, largely different sets per sort, so no single
 describes it. `selectedArtist` holds the key, `selectedLabel` holds the display text;
 they diverge only for this surface.
 
+### New releases (SD-24)
+
+`NEW_KEY` (`'__new__'`) is the second sentinel surface, built exactly like the global
+chart: a synthetic dropdown row, a deep link (`?artist=new`), one precomputed file.
+`build_pages.py` writes `data/new.json` as `{since, until, days, songs}`: every song
+whose `releaseDate` falls within `NEW_RELEASE_DAYS = 7` of the data date, where the data
+date is the mtime of `data.json.gz`, i.e. the scrape date. The refresh runs Mondays and
+releases land on Fridays, so the window spans exactly one release day plus its weekend.
+The pool is tens of songs, because a song must reach 1M streams within days to be in
+the dataset at all.
+
+**The plausibility gate is load-bearing** (`NEW_MAX_DECAY = 10`). Spotify's date is the
+album date of the track's canonical version, and when a single is folded into an album
+Spotify relinks the single's ID to the album version, so the single inherits the album
+date. On the first dated build, 28 songs sat in the window and the top one by total
+streams had 265M, five days after its "release". A song D days on sale cannot have
+streamed more than D times its peak day, so the gate accepts only
+`totalStreams <= 10 * D * dailyStreams`. Measured: genuine releases score 1 to 9,
+pre-release singles absorbed into the album 10 to 18, older songs 35 to 68. It cut the
+pool to 13. The earliest-across-cluster rule in `cleanup.py` only helps once the
+backfill has dated the older URL, so the gate is what holds in the meantime and for
+singles whose original ID never appears separately.
+
+The surface obeys the app-wide sort select like everything else. Measured on the
+10 August data: the top 30 by total and by daily streams among freshly released songs
+share 27 rows, because every song in a 7-day window has roughly the same number of
+days on sale. `NEW_LABEL` hard-codes the "7"; keep it in step with `NEW_RELEASE_DAYS`.
+`newWindow` holds the shipped window so the results line can name the dates.
+
+A crawlable `public/new/index.html` mirrors the artist pages (top 50 as text, JSON-LD
+with `datePublished`, in the sitemap).
+
+Every row, on every surface, now shows a **Released** column (table) or line (mobile
+card), an en dash when unknown. The render signature includes `releaseDate`, and
+`make_preload.py` inlines it, otherwise the preload rows would never be rebuilt once
+the shard arrived and the first ten Billie Eilish rows would show no date.
+
 ### Theming (SD-15, SD-16)
 
 `styles.css` defines semantic tokens, not literal colours. The old `--black` / `--white`
@@ -285,8 +375,8 @@ Despite the name, **it applies no filters beyond artist selection.** The stream 
 filters were removed. `sortFiltered()` handles strings and numbers and both directions,
 though only `-desc` options are exposed.
 
-**Sort does not auto-apply.** There is no `change` listener on `#sort-select`; the user
-must click Apply. See `MISC.md`.
+**Sort applies on change.** The Apply button was removed along with the sliders it
+gated; `#sort-select` has a `change` listener that calls `applyFilters()`.
 
 ### Rendering
 
@@ -332,7 +422,11 @@ full value is available on hover. Applied at 45 chars for title, 35 for artist.
 | `MAX_RETRIES` | scrape.py | 3 | With `RETRY_BACKOFF = 2` |
 | `STREAM_TOLERANCE` | cleanup.py | 0.02 | Fuzzy match for dedup |
 | `MIN_TOTAL_STREAMS` | cleanup.py | 1_000_000 | Long-tail cutoff |
-| `PAGE_SIZE` | app.js | 10 | Lowered for the iframe fix |
+| `PAGE_SIZE_DESKTOP` / `PAGE_SIZE_MOBILE` | app.js | 30 / 30 | 10 in March (SD-3), 50 broke mobile (R25), 30 since |
+| `NEW_RELEASE_DAYS` | build_pages.py | 7 | Window for the new-releases surface (SD-24) |
+| `NEW_MAX_DECAY` | build_pages.py | 10 | Plausibility gate: total <= 10 x days x daily, else the date is an album re-date |
+| `PACE` | release_dates.py | 2.0 | Embed fetches per second; 9/s drew 429s |
+| `MAX_FETCHES` | release_dates.py | 5000 | Per-run budget; env `RELEASE_DATES_MAX` overrides |
 | `DEFAULT_ARTIST` | app.js | 'Billie Eilish' | Must match `PRELOAD` |
 | `SHOW_STREAM_SLIDERS` | app.js | false | **Dead flag, see below** |
 
@@ -393,8 +487,8 @@ site to older numbers (nearly happened in R29). `build_pages.py` stamps the data
 mtime into `data/meta.json`; `deploy.sh` compares it against the live copy and aborts
 if local is older. Fail-open when the live stamp is unreachable.
 
-**The pipeline only runs what is committed.** CI executes `cleanup.py` and
-`build_pages.py` from the repo, not from anyone's working tree. Uncommitted fixes do
+**The pipeline only runs what is committed.** CI executes `release_dates.py`,
+`cleanup.py` and `build_pages.py` from the repo, not from anyone's working tree. Uncommitted fixes do
 not exist as far as the weekly refresh is concerned; that is how the dedup fix and the
 widget silently reverted in the 3 and 10 August runs (B-19). After changing pipeline
 code, commit and push it, or the next scheduled run undoes the behaviour.
@@ -425,10 +519,15 @@ Current deploy: 6,011 files, ~154 MB, largest single file 684 KB.
 ## Commands
 
 ```bash
-# Full refresh and publish (~60 min, resumable)
-python3 scrape.py       # writes data.json
-python3 cleanup.py      # writes data.json.gz (build intermediate, not deployed)
-./deploy.sh             # builds the generated surface, gates on limits, publishes
+# Full refresh and publish (~60 to 85 min, resumable)
+python3 scrape.py        # writes data.json
+python3 release_dates.py # appends new track IDs to release_dates.txt (commit it)
+python3 cleanup.py       # writes data.json.gz (build intermediate, not deployed)
+./deploy.sh              # builds the generated surface, gates on limits, publishes
+
+# One-off local backfill of the whole catalogue (~2 days at 2/s, resumable, safe to
+# interrupt; every 200 results are flushed to the registry)
+RELEASE_DATES_MAX=400000 python3 release_dates.py
 
 # Frontend: a local server is REQUIRED, and it must serve public/.
 cd public && python3 -m http.server 8000
@@ -437,9 +536,11 @@ cd public && python3 -m http.server 8000
 ## Files
 
 - `scrape.py`: kworb scraper
-- `cleanup.py`: dedup, encoding fix, popularity, compression
+- `release_dates.py`: Spotify embed page scraper, one fetch per new track ID
+- `release_dates.txt`: append-only track ID to release date registry (SD-24). Committed.
+- `cleanup.py`: dedup, encoding fix, popularity, release date, compression
 - `build_pages.py`: generates artist pages, per-artist shards, the global chart, the
-  A-Z hub and the sitemap. Owns `slugs.json`.
+  new-releases file and page, the A-Z hub and the sitemap. Owns `slugs.json`.
 - `slugs.json`: append-only artist name to URL slug registry (SD-21). Committed.
 - `deploy.sh`: build, gate, publish
 - `make_preload.py`: regenerates the inlined `PRELOAD` block from `data.json.gz`
@@ -449,7 +550,7 @@ cd public && python3 -m http.server 8000
   inline header mark
 - `robots.txt`: permissive; revisit when per-artist pages exist
 - `snapshots/`: dated copies of past `data.json.gz`, for future time-window deltas
-- `data.json.gz`: generated dataset, committed
+- `data.json.gz`: generated dataset, NOT committed (SD-19)
 - `scrape_progress.json`: temporary resume file, auto-deleted on success
 - `index.html` / `styles.css` / `app.js`: frontend
 - `requests.md`: request log and standing decisions

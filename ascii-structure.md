@@ -5,7 +5,7 @@ to find a file, level 3 to change one.
 
 Updated after every request. See the maintenance protocol in `CLAUDE.md`.
 
-Last verified: 1 August 2026.
+Last verified: 30 September 2026.
 
 ---
 
@@ -44,8 +44,9 @@ No build tools, no frameworks, no package manager (SD-1).
 spotify_filter/
 |
 +-- PIPELINE (Python, standalone, no CLI args)
-|   +-- scrape.py ............ kworb -> data.json          ~60 min, resumable
-|   +-- cleanup.py ........... data.json -> data.json.gz   dedup, encoding, popularity
+|   +-- scrape.py ............ kworb -> data.json          ~60 to 85 min, resumable
+|   +-- release_dates.py ..... Spotify embed page -> release_dates.txt   3/s, resumable
+|   +-- cleanup.py ........... data.json -> data.json.gz   dedup, encoding, popularity, date
 |   +-- build_pages.py ....... data.json.gz -> public/*    pages, shards, sitemap
 |   +-- make_preload.py ...... refreshes the inlined PRELOAD block in app.js
 |
@@ -59,6 +60,8 @@ spotify_filter/
 |       +-- data/artists.json .................... index, 45 KB gzipped
 |       +-- data/artist/<slug>.json .............. 2,998 shards, ~7 KB each
 |       +-- data/global.json ..................... top 1,000 per sort
+|       +-- data/new.json ........................ released in the last 7 days
+|       +-- new/index.html ....................... crawlable new-releases page
 |       +-- artists/index.html ................... A-Z hub
 |       +-- sitemap.xml .......................... 3,000 URLs
 |
@@ -69,6 +72,7 @@ spotify_filter/
 |
 +-- STATE
 |   +-- slugs.json ........... append-only name -> slug registry (SD-21). COMMITTED.
+|   +-- release_dates.txt .... append-only track id -> date registry (SD-24). COMMITTED.
 |   +-- snapshots/ ........... dated archives. Local disk only, not committed.
 |   +-- data.json ............ scraper output, ~106 MB. Intermediate.
 |   +-- data.json.gz ......... cleaned, ~19.6 MB. Intermediate, feeds build_pages.
@@ -106,6 +110,15 @@ kworb.net/spotify/artists.html
    v
 data.json ....................... 507,226 records, ~106 MB, gitignored
    |
+   |  release_dates.py
+   |    load_registry() ................ release_dates.txt, "<id> <date>" lines
+   |    queue = ids >= 1M streams not in registry, popularity DESC
+   |    Pacer ........................... 3/s across 4 workers; 429 pauses all
+   |    fetch_one() -> parse_date() ..... embed page __NEXT_DATA__ releaseDate
+   |    append every 200; fail if parse rate < 80%
+   v
+release_dates.txt ............... append-only, committed (SD-24)
+   |
    |  cleanup.py
    |    fix_encoding() ................. latin-1 -> utf-8 round trip
    |    parse_artist_string() .......... backfill for pre-SD-13 input only
@@ -114,6 +127,7 @@ data.json ....................... 507,226 records, ~106 MB, gitignored
    |    merge_artists() ................ display string only, absorbs substrings
    |    popularity = daily/total * 1e6
    |    drop < MIN_TOTAL_STREAMS (1,000,000)
+   |    releaseDate = min(registry[id] for id in cluster _urls), omitted if none
    v
 data.json.gz .................... 321,878 songs, 19.6 MB, gitignored
    |                              discards 36.5%: 175,256 sub-1M + 10,092 merged
@@ -124,8 +138,10 @@ data.json.gz .................... 321,878 songs, 19.6 MB, gitignored
    |    co-occurrence map .............. 12 collaborator links per page
    |    page_html() .................... 50 songs as text + MusicGroup/
    |                                     BreadcrumbList/ItemList JSON-LD
+   |    new_releases() ................. releaseDate >= data date - NEW_RELEASE_DAYS
+   |    new_page_html() ................ /new/ with datePublished JSON-LD
    v
-public/{artist,artists,data,sitemap.xml}
+public/{artist,artists,new,data,sitemap.xml}
    |
    |  make_preload.py ................. rewrites PRELOAD in app.js so the render
    |                                    signature guard keeps matching (B-6)
@@ -155,14 +171,15 @@ index.html
          applyFilters()  [async, guarded by applyToken]
            |-- songsForArtist(sel)
            |     |-- GLOBAL_KEY -> data/global.json  (capped 1,000, per sort)
+           |     |-- NEW_KEY    -> data/new.json     (window shipped as newWindow)
            |     +-- artist     -> data/artist/<slug>.json  (cached in shardCache)
            |-- sortFiltered()
            +-- render()
                  |-- chrome ALWAYS: results count, empty state, pagination
-                 |-- rowSignature = artist|sortKey|sortDir|start|rows
+                 |-- rowSignature = artist|sortKey|sortDir|start|rows(+releaseDate)
                  |     early-return if unchanged  <- kills the load flash
                  |-- iframe teardown: blank src BEFORE remove (SD-3, load-bearing)
-                 +-- build 10 table rows + 10 mobile cards
+                 +-- build 30 table rows OR 30 mobile cards, each with Released
 ```
 
 ### Where the constraints live
@@ -177,6 +194,8 @@ SD-16  #1DB954 is a FILL, never text ... styles.css --accent vs --accent-text
 SD-19  nothing generated is committed .. .gitignore + deploy.sh
 SD-20  Workers Builds stays disabled ... Cloudflare dashboard (external)
 SD-21  slugs.json append-only .......... build_pages.py assign_slugs
+SD-23  popularity chart floor 400k ..... build_pages.py POP_MIN_DAILY
+SD-24  embed-page dates, 7-day window .. release_dates.py, build_pages.py NEW_RELEASE_DAYS
 ```
 
 ### Known dead code (deliberate, SD-8)

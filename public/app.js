@@ -29,6 +29,21 @@ const GLOBAL_KEY = '__global__';
 const GLOBAL_LABEL = 'Global chart (all artists)';
 const GLOBAL_CAP = 1000;
 
+// New releases (R33). Same pattern as the global chart: a sentinel key that cannot
+// collide with an artist name and one precomputed file, data/new.json, holding every
+// song whose releaseDate falls inside the window build_pages.py chose
+// (NEW_RELEASE_DAYS, which the "7" in the label must match). The file ships the window
+// itself so the results line can say what "new" means for this data vintage.
+const NEW_KEY = '__new__';
+const NEW_LABEL = 'New releases (last 7 days)';
+let newWindow = null;   // { since, until, days } once data/new.json has loaded
+
+// Deep-link slugs for the two non-artist surfaces.
+const SURFACES = {
+  global: { key: GLOBAL_KEY, label: GLOBAL_LABEL },
+  new: { key: NEW_KEY, label: NEW_LABEL },
+};
+
 // Related artists. Derived from the artist's own shard, which already contains exactly
 // the songs they appear on, so it needs no extra file and no extra request. Verified
 // to match build_pages.py's whole-dataset co-occurrence byte for byte.
@@ -36,7 +51,7 @@ const RELATED_CAP = 12;
 const SHOW_STREAM_SLIDERS = false;
 
 // Billie Eilish preload for instant display (sorted by total streams)
-const PRELOAD = [{"title":"BIRDS OF A FEATHER","artist":"Billie Eilish","totalStreams":4006470815,"dailyStreams":2056011,"url":"https://open.spotify.com/track/6dOtVTDdiauQNBQEDOtlAB","popularity":513.2},{"title":"lovely (with Khalid)","artist":"Billie Eilish (feat. Khalid)","totalStreams":3889791037,"dailyStreams":978095,"url":"https://open.spotify.com/track/0u2P5u6lvoDfwTYjAADbn4","popularity":251.5},{"title":"bad guy","artist":"Billie Eilish, Justin Bieber","totalStreams":2982050465,"dailyStreams":472861,"url":"https://open.spotify.com/track/2Fxmhks0bxGSBdJ92vM42m","popularity":158.6},{"title":"when the party's over","artist":"Billie Eilish","totalStreams":2567329550,"dailyStreams":517039,"url":"https://open.spotify.com/track/43zdsphuZLzwA9k4DJhU0I","popularity":201.4},{"title":"ocean eyes","artist":"Billie Eilish","totalStreams":2319211785,"dailyStreams":885871,"url":"https://open.spotify.com/track/2uIX8YMNjGMD7441kqyyNU","popularity":382.0},{"title":"WILDFLOWER","artist":"Billie Eilish","totalStreams":2278642720,"dailyStreams":1600338,"url":"https://open.spotify.com/track/3QaPy1KgI7nu9FJEQUgn6h","popularity":702.3},{"title":"everything i wanted","artist":"Billie Eilish","totalStreams":2176821935,"dailyStreams":421575,"url":"https://open.spotify.com/track/3ZCTVFBt2Brf31RLEnCkWJ","popularity":193.7},{"title":"Happier Than Ever","artist":"Billie Eilish","totalStreams":1928731663,"dailyStreams":549826,"url":"https://open.spotify.com/track/4RVwu0g32PAqgUiJoXsdF8","popularity":285.1},{"title":"What Was I Made For? [From The Motion Picture \"Barbie\"]","artist":"Billie Eilish","totalStreams":1684845662,"dailyStreams":565916,"url":"https://open.spotify.com/track/6wf7Yu7cxBSPrRlWeSeK0Q","popularity":335.9},{"title":"i love you","artist":"Billie Eilish","totalStreams":1415983369,"dailyStreams":401365,"url":"https://open.spotify.com/track/6CcJMwBtXByIz4zQLzFkKc","popularity":283.5}];
+const PRELOAD = [{"title":"BIRDS OF A FEATHER","artist":"Billie Eilish","totalStreams":4010444217,"dailyStreams":2090876,"url":"https://open.spotify.com/track/6dOtVTDdiauQNBQEDOtlAB","popularity":521.4},{"title":"lovely (with Khalid)","artist":"Billie Eilish (feat. Khalid)","totalStreams":3891726352,"dailyStreams":993958,"url":"https://open.spotify.com/track/0u2P5u6lvoDfwTYjAADbn4","popularity":255.4},{"title":"bad guy","artist":"Billie Eilish, Justin Bieber","totalStreams":2982902681,"dailyStreams":442011,"url":"https://open.spotify.com/track/2Fxmhks0bxGSBdJ92vM42m","popularity":148.2},{"title":"when the party's over","artist":"Billie Eilish","totalStreams":2568409072,"dailyStreams":573073,"url":"https://open.spotify.com/track/43zdsphuZLzwA9k4DJhU0I","popularity":223.1},{"title":"ocean eyes","artist":"Billie Eilish","totalStreams":2321035171,"dailyStreams":945362,"url":"https://open.spotify.com/track/2uIX8YMNjGMD7441kqyyNU","popularity":407.3},{"title":"WILDFLOWER","artist":"Billie Eilish","totalStreams":2281940946,"dailyStreams":1729499,"url":"https://open.spotify.com/track/3QaPy1KgI7nu9FJEQUgn6h","popularity":757.9},{"title":"everything i wanted","artist":"Billie Eilish","totalStreams":2177693842,"dailyStreams":457685,"url":"https://open.spotify.com/track/3ZCTVFBt2Brf31RLEnCkWJ","popularity":210.2},{"title":"Happier Than Ever","artist":"Billie Eilish","totalStreams":1929867678,"dailyStreams":596945,"url":"https://open.spotify.com/track/4RVwu0g32PAqgUiJoXsdF8","popularity":309.3},{"title":"What Was I Made For? [From The Motion Picture \"Barbie\"]","artist":"Billie Eilish","totalStreams":1686005312,"dailyStreams":609125,"url":"https://open.spotify.com/track/6wf7Yu7cxBSPrRlWeSeK0Q","popularity":361.3},{"title":"i love you","artist":"Billie Eilish","totalStreams":1416820105,"dailyStreams":437876,"url":"https://open.spotify.com/track/6CcJMwBtXByIz4zQLzFkKc","popularity":309.1}];
 
 // State
 let artistIndex = {};  // { "artist name lowercase": { name: "Display Name", count: N } }
@@ -75,6 +90,15 @@ function abbreviate(n) {
 
 function fullFormat(n) {
   return n.toLocaleString();
+}
+
+// "2019-05-17" -> "17 May 2019". Built from the ISO parts, not Date(), so a date never
+// shifts by a day in a timezone west of UTC.
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+function formatDate(iso) {
+  if (!iso) return '\u2013';
+  const [y, m, d] = iso.split('-');
+  return `${+d} ${MONTHS[+m - 1]} ${y}`;
 }
 
 // Slider logic. DEAD CODE, kept deliberately per SD-8. SHOW_STREAM_SLIDERS is never
@@ -124,8 +148,8 @@ function buildArtistIndex(entries) {
   artistIndex = {};
   for (const e of entries) {
     const key = e.n.toLowerCase();
-    if (key === GLOBAL_KEY) {
-      console.warn('An artist is named ' + GLOBAL_KEY + '; the global chart key collides.');
+    if (key === GLOBAL_KEY || key === NEW_KEY) {
+      console.warn('An artist is named ' + key + '; a surface key collides.');
       continue;
     }
     artistIndex[key] = { name: e.n, slug: e.s, count: e.c };
@@ -173,6 +197,11 @@ async function songsForArtist(artistName) {
     const glob = await fetchJson('data/global.json', 'global');
     return (glob[sortKey] || glob.totalStreams).slice();
   }
+  if (artistName === NEW_KEY) {
+    const data = await fetchJson('data/new.json', 'new');
+    newWindow = { since: data.since, until: data.until, days: data.days };
+    return data.songs.slice();
+  }
   const entry = artistIndex[artistName.toLowerCase()];
   if (!entry) return [];
   // Before the index lands, PRELOAD is all we have and it has no shard.
@@ -192,6 +221,10 @@ async function fetchJson(url, cacheKey) {
 
 function isGlobal() {
   return selectedArtist === GLOBAL_KEY;
+}
+
+function isNew() {
+  return selectedArtist === NEW_KEY;
 }
 
 function sortLabel() {
@@ -238,9 +271,10 @@ function selectArtist(key, label) {
   // Reflect the selection in the URL so artist pages can deep-link into the app and
   // the back button works.
   const entry = artistIndex[key.toLowerCase()];
-  const slug = key === GLOBAL_KEY ? 'global' : (entry && entry.slug);
+  const surfaceSlug = Object.keys(SURFACES).find(k => SURFACES[k].key === key);
+  const slug = surfaceSlug || (entry && entry.slug);
   if (slug && window.history && history.pushState) {
-    history.pushState({ artist: slug }, '', slug === 'global' ? '/?artist=global' : `/?artist=${slug}`);
+    history.pushState({ artist: slug }, '', `/?artist=${slug}`);
   }
   applyFilters();
 }
@@ -279,14 +313,22 @@ function render() {
   // preload shows 10 of Billie Eilish's songs, the full dataset shows 10 of 78).
   if (totalResults === 0) {
     resultsCount.textContent = '';
+    noResults.textContent = isNew()
+      ? `No song released in the last ${newWindow ? newWindow.days : 7} days has reached a million streams yet.`
+      : 'No songs found for this artist';
     noResults.style.display = 'block';
     tableWrapper.style.display = 'none';
   } else {
     // textContent is already injection-safe; escaping here would double-encode "&"
     // in names like "Mumford & Sons".
-    resultsCount.textContent = isGlobal()
-      ? `Global chart: showing ${start + 1}\u2013${end} of the top ${totalResults.toLocaleString()} songs by ${sortLabel()}`
-      : `${selectedLabel}: showing ${start + 1}\u2013${end} of ${totalResults.toLocaleString()} songs`;
+    if (isGlobal()) {
+      resultsCount.textContent = `Global chart: showing ${start + 1}\u2013${end} of the top ${totalResults.toLocaleString()} songs by ${sortLabel()}`;
+    } else if (isNew()) {
+      const window_ = newWindow ? ` released ${formatDate(newWindow.since)} to ${formatDate(newWindow.until)}` : '';
+      resultsCount.textContent = `New releases: showing ${start + 1}\u2013${end} of ${totalResults.toLocaleString()} songs${window_}, by ${sortLabel()}`;
+    } else {
+      resultsCount.textContent = `${selectedLabel}: showing ${start + 1}\u2013${end} of ${totalResults.toLocaleString()} songs`;
+    }
     noResults.style.display = 'none';
     tableWrapper.style.display = '';
   }
@@ -298,7 +340,7 @@ function render() {
   // embeds alive because nothing detaches them.
   const rowSignature = selectedArtist + '|' + sortKey + '|' + sortDir + '|' + start + '|' +
     (mobileQuery.matches ? 'm|' : 'd|') +
-    page.map(s => s.url + ':' + s.totalStreams + ':' + s.dailyStreams).join(',');
+    page.map(s => s.url + ':' + s.totalStreams + ':' + s.dailyStreams + ':' + (s.releaseDate || '')).join(',');
   if (rowSignature === lastRenderSignature) return;
   lastRenderSignature = rowSignature;
 
@@ -320,6 +362,7 @@ function render() {
       <td>${truncate(song.artist, 35)}</td>
       <td title="${fullFormat(song.totalStreams)}">${abbreviate(song.totalStreams)}</td>
       <td title="${fullFormat(song.dailyStreams)}">${abbreviate(song.dailyStreams)}</td>
+      <td class="date-cell">${formatDate(song.releaseDate)}</td>
       <td class="embed-cell">${embedUrl ? `<iframe src="${embedUrl}" width="300" height="152" frameborder="0" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="lazy"></iframe>` : '<span class="no-preview">No preview</span>'}</td>
     `;
     resultsBody.appendChild(tr);
@@ -341,6 +384,7 @@ function render() {
       <div class="song-card-streams">
         <div><span>Total </span><strong>${abbreviate(song.totalStreams)}</strong></div>
         <div><span>Daily </span><strong>${abbreviate(song.dailyStreams)}</strong></div>
+        <div><span>Released </span><strong>${formatDate(song.releaseDate)}</strong></div>
       </div>
     `;
     mobileCards.appendChild(card);
@@ -487,16 +531,13 @@ artistInput.addEventListener('input', () => {
   // plainly matches, so it is discoverable without polluting real artist searches.
   const wantsGlobal = query.length <= 2 ||
     'global chart all artists'.includes(query) || 'all'.startsWith(query);
+  const wantsNew = query.length <= 2 ||
+    'new releases last 7 days'.includes(query) || 'latest'.startsWith(query);
   const rows = matches.slice(0, 15);
-  if (wantsGlobal) {
-    rows.unshift({
-      name: GLOBAL_LABEL,
-      key: GLOBAL_KEY,
-      // No count: the chart is the top 1,000 PER SORT (largely different sets), so a
-      // single "1,000 songs" was misleading. Artist rows keep their counts.
-      count: null,
-    });
-  }
+  // No count on either surface row: the global chart is the top 1,000 PER SORT
+  // (largely different sets), and the new-releases pool changes size every week.
+  if (wantsNew) rows.unshift({ name: NEW_LABEL, key: NEW_KEY, count: null });
+  if (wantsGlobal) rows.unshift({ name: GLOBAL_LABEL, key: GLOBAL_KEY, count: null });
 
   showDropdown(rows);
 });
@@ -636,7 +677,7 @@ function relatedArtists(songs, forName) {
 
 function renderRelated(songs) {
   relatedEl.innerHTML = '';
-  const related = isGlobal() ? [] : relatedArtists(songs, selectedArtist);
+  const related = (isGlobal() || isNew()) ? [] : relatedArtists(songs, selectedArtist);
   if (!related.length) {
     relatedEl.hidden = true;
     return;
@@ -697,12 +738,11 @@ async function init() {
 
   // Deep link from a generated artist page, e.g. /?artist=tyler-the-creator
   if (deepLink) {
-    const hit = deepLink === 'global'
-      ? { name: GLOBAL_LABEL, key: GLOBAL_KEY }
-      : entries.find(e => e.s === deepLink);
+    const surface = SURFACES[deepLink];
+    const hit = surface || entries.find(e => e.s === deepLink);
     if (hit) {
-      selectedArtist = deepLink === 'global' ? GLOBAL_KEY : hit.n;
-      selectedLabel = deepLink === 'global' ? GLOBAL_LABEL : hit.n;
+      selectedArtist = surface ? surface.key : hit.n;
+      selectedLabel = surface ? surface.label : hit.n;
       artistInput.value = selectedLabel;
     }
   }
@@ -713,7 +753,8 @@ async function init() {
 window.addEventListener('popstate', () => {
   const slug = new URLSearchParams(location.search).get('artist');
   const entry = slug && Object.values(artistIndex).find(e => e.slug === slug);
-  if (slug === 'global') { selectedArtist = GLOBAL_KEY; selectedLabel = GLOBAL_LABEL; }
+  const surface = SURFACES[slug];
+  if (surface) { selectedArtist = surface.key; selectedLabel = surface.label; }
   else if (entry) { selectedArtist = entry.name; selectedLabel = entry.name; }
   else { selectedArtist = DEFAULT_ARTIST; selectedLabel = DEFAULT_ARTIST; }
   artistInput.value = selectedLabel;

@@ -61,6 +61,16 @@ jobs:
       - name: Scrape kworb
         run: python3 scrape.py
 
+      - name: Fetch release dates
+        # One Spotify embed page per track ID not yet in release_dates.txt, which is
+        # append-only and committed below (R33). Fetch order is popularity, so this
+        # week's releases are covered first even when the per-run budget cuts the
+        # long-tail backfill short. continue-on-error: a broken fetch must not block
+        # the stream refresh; cleanup.py still reads last week's registry and only the
+        # new-releases page goes stale. The step still shows red in the run.
+        continue-on-error: true
+        run: python3 release_dates.py
+
       - name: Clean, dedupe, compress
         run: python3 cleanup.py
 
@@ -118,6 +128,13 @@ jobs:
               if tid not in urls:
                   sys.exit(f"FAIL: {who}'s 'The Greatest' ({tid}) is missing: "
                            "different-artist songs are being merged again.")
+          # R33: release dates ride on the records. Absent everywhere means
+          # release_dates.py never wrote the registry; warn, do not fail, since the
+          # stream data itself is fine.
+          dated = sum(1 for s in songs if "releaseDate" in s)
+          print(f"{dated:,} songs carry a releaseDate")
+          if dated == 0:
+              print("::warning::No song has a releaseDate. Check the 'Fetch release dates' step.")
           print("shape, SD-13 and dedup invariants OK")
           EOF
 
@@ -145,7 +162,7 @@ jobs:
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add public/app.js slugs.json
+          git add public/app.js slugs.json release_dates.txt
           if git diff --staged --quiet; then
             echo "Nothing changed; skipping commit."
           else

@@ -617,3 +617,81 @@ Updated after every request. See the maintenance protocol in `CLAUDE.md`.
         |
   (( global popularity now floors at 400k daily ))
 ```
+
+## R32, 30 September: "is the release date available to be scraped for each song?"
+
+```
+  (( question: where would a release date come from? ))
+        |
+        [ kworb songs page headers ] --> Song Title, Streams, Daily: no date
+        |
+        [ kworb track page ] --> chart-entry dates only, not release
+        |
+        [ Spotify oEmbed ] --> title + thumbnail only
+        |
+        [ Spotify embed page ] --> __NEXT_DATA__ has releaseDate.isoString
+        |     3 tracks tested, 200, no auth, ~10 KB, 0.2 to 0.5 s each
+        |     !!! undocumented; can change without notice
+        |
+        [ Spotify Web API /v1/tracks ] --> album.release_date, 50 per call
+        |     needs a developer app + client-credentials token
+        |
+        [ cost ] --> one lookup per song either way; 323k songs, ~3 h via API
+        |            batch, tens of hours via embed; incremental after backfill
+        |
+        [ options presented, recommendation held ]   *** SD-12
+        |
+  (( awaiting choice, R-7 ))
+```
+
+## R33, 30 September: "research the best option and apply it; add a last-week releases page"
+
+```
+  (( choice delegated to research, options already on the table (R32) ))   *** SD-12
+        |
+        [ Web API status ] --> Feb 2026: Premium required, batch GET /tracks removed,
+        |                      Client Credentials being retired for metadata
+        |                      => one request per track anyway + a secret + a subscription
+        |
+        [ embed page ] --> __NEXT_DATA__ entity.releaseDate.isoString, ~11 KB, no auth
+        |     burst 40 @ 4 workers: 40/40 ok
+        |     run 4 workers, ~9/s: 191 ok then 429 x25   !!! rate limited
+        |     wait ~60 s: clears
+        |     serial 2/s x 300: 0 limited;  3/s x 400: 0 limited
+        |     => PACE 3/s, shared 429 pause, global limiter
+        |
+        [ decision: embed page ]   *** SD-24
+        |
+        [ release_dates.py ] --> registry release_dates.txt, append-only, committed
+        |     order: popularity DESC  => this week's releases always fetched first
+        |     budget: 6,000 per CI run; local backfill RELEASE_DATES_MAX=400000
+        |     alarm: parse rate < 80% => exit 1 (CI: continue-on-error)
+        |
+        [ cleanup.py ] --> releaseDate = min(date over merged cluster _urls)
+        [ build_pages.py ] --> data/new.json {since, until, days, songs} + /new/ page
+        |                      window NEW_RELEASE_DAYS = 7 ending at the data date
+        [ app.js ] --> __new__ surface: dropdown row, ?artist=new, results line,
+        |              Released column + card line, signature includes the date
+        [ make_preload.py ] --> inlines releaseDate  (else preload rows never rebuild)
+        [ workflow ] --> fetch step + commit release_dates.txt
+        |
+        [ metric ] --> top-30 by total vs daily among young songs: 27/30 overlap
+        |              => obey the app-wide sort, no special default
+        |
+        [ verify ] --> cleanup + build end to end; headless Chrome 1400px table row
+        |              has date-cell, 400px card has "Released"; ?artist=new empty
+        |              state is surface-specific
+        |
+        [ fresh scrape: 511,148 raw ] --> top 3,000 by popularity dated (17 min)
+        |
+        [ first dated build ] --> 28 in the window
+        |     !!! #1 by total: 265M streams, "released" 5 days ago
+        |     cause: Spotify relinks a single to its album => album date
+        |     measure total/(daily*D): genuine 1-9, absorbed singles 10-18, old 35-68
+        |
+        [ plausibility gate NEW_MAX_DECAY = 10 ] --> 13 kept, 15 dropped
+        |
+        [ deploy + verify live ] --> see closing note in R33
+        |
+  (( release dates on every song; /new/ live ))
+```

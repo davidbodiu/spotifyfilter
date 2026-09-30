@@ -41,6 +41,7 @@ silently.
 | SD-21 | `slugs.json` is append-only. A name's slug is never reassigned. | R19 | A changed slug destroys its own URL, backlinks and rankings. |
 | SD-22 | Spotify embeds are left exactly as they are, dark in both themes. | R19 | Verified: no light embed exists. User chose to leave it. |
 | SD-23 | The global **popularity** chart only ranks songs with >= 400k daily streams (`POP_MIN_DAILY`). Other sorts and per-artist views are unfiltered. | R31 | popularity = daily/total explodes near the 1M total floor; user chose a daily floor over a total floor or damped ratio. |
+| SD-24 | Release dates come from the Spotify **embed page**, one fetch per track ID, into `release_dates.txt`, which is append-only and committed. The new-releases surface is a 7-day window (`NEW_RELEASE_DAYS`) behind a plausibility gate (`NEW_MAX_DECAY`, since Spotify re-dates singles to their album) and obeys the app-wide sort. | R33 | The Web API now needs Premium, lost batch `GET /tracks` and is retiring Client Credentials for metadata; the embed page needs nothing. User delegated the choice to research (R33) after the options were laid out in R32. |
 
 ---
 
@@ -765,6 +766,107 @@ top = 'Te Estoy Correteando' / LATIN MAFIA; overlap with the daily chart 551/100
 exactly as measured in R30; totalStreams and dailyStreams charts byte-order unchanged.
 Deployed as `16de7573`. Recorded as SD-23; committed and pushed so Monday's CI run
 builds with the floor (the B-19 failure class).
+
+**R32. "Just wondering if the release date is available to be scraped somehow for each
+song?"**
+
+Question only, no code changed. Checked at the source rather than from memory:
+
+- kworb's artist songs page (the one `scrape.py` reads) has no date column: headers are
+  Song Title, Streams, Daily. kworb's per-track chart-history page has dates, but they
+  are chart-entry dates, not release dates; a 2019 song that re-charted in 2025 shows
+  2025.
+- Spotify's oEmbed endpoint returns title and thumbnail only.
+- Spotify's embed page (`open.spotify.com/embed/track/<id>`, the same URL every row
+  already loads as an iframe) embeds a `__NEXT_DATA__` JSON blob containing
+  `releaseDate.isoString`. Verified on three tracks, 200 with no auth and no
+  User-Agent, ~10 KB, 0.2 to 0.5 s each. Undocumented and unversioned.
+- Spotify Web API `/v1/tracks?ids=` (50 per call) returns `album.release_date` with a
+  precision field. Needs a free developer app and a client-credentials token.
+
+Cost either way is one request per song, and the dataset is 323k songs (507k raw), so
+a full backfill is ~3 hours at the API's batch size or ~40 to 70 hours at one embed
+fetch per song; after that only new tracks need fetching each week. Presented as
+options per SD-12, recommendation held. Logged as R-7 (`DECISION`) in MISC.md.
+
+**R33. "Please do some research to find the best option and then apply it, keeping in
+mind that the database is updated every week... Want to add a page that shows the most
+popular that were released in the last week using either daily or total streams, or
+something else you'd recommend."**
+
+The user delegated the R32 choice to research rather than picking, which satisfies
+SD-12: the options were on the table first. Research, all verified rather than
+recalled:
+
+- **Web API, closed in practice.** Spotify's February 2026 Development Mode changes
+  (migration guide, TechCrunch): the app owner needs an active Premium subscription,
+  one Client ID per developer, five users, and the batch `GET /tracks` endpoint is gone
+  ("fetch items individually instead"). Spotify also says it is "moving away from the
+  Client Credentials flow for metadata endpoints". So the API would be one request per
+  track anyway, plus a secret in CI and a subscription dependency.
+- **Embed page, chosen.** `open.spotify.com/embed/track/<id>` inlines `__NEXT_DATA__`
+  with `entity.releaseDate.isoString`. No auth, no User-Agent, ~11 KB gzipped. Rate
+  limit measured on the day: a burst at ~9/s drew 429s after ~190 requests and cleared
+  within a minute; 2/s for 300 and 3/s for 400 requests drew none. Consistent with a
+  ~200-per-minute bucket. Pace set to 3/s with a shared pause on 429.
+- **The full track page** has an Open Graph `music:release_date` meta tag, so it is a
+  documented-ish fallback, but it is 305 KB against 11 KB.
+- **kworb** has nothing: the songs page is title/streams/daily, the track page is
+  chart-entry dates.
+
+**Built.** `release_dates.py` between scrape and cleanup, `release_dates.txt` registry
+(append-only, committed, SD-24), `releaseDate` on every record (earliest across a
+merged cluster), `data/new.json` plus a crawlable `/new/` page from `build_pages.py`, a
+`__new__` surface in the app mirroring the global chart (dropdown row, `?artist=new`
+deep link, results line naming the window), a **Released** column on every table row
+and mobile card, and a CI step with `continue-on-error` so a broken fetch cannot block
+the stream refresh. `make_preload.py` inlines the date and the render signature
+includes it, so the preload rows rebuild once the dated shard lands.
+
+**Fetch order is popularity descending**, which is the trick that makes a weekly
+budget work: a song a few days old has a daily/total ratio no back-catalogue track can
+reach, so the ~1,650 IDs new each week (measured: 32,079 new URLs over the 19 weeks
+between the March and August snapshots) and every plausible new release are fetched
+before anything else. CI's budget is 6,000 per run (~33 min); the ~332k cold backfill
+runs locally, resumable, about 31 hours at 3/s.
+
+**Ranking metric.** The user offered daily or total streams. Measured on the August
+data among songs with total/daily under 10, a proxy for "released this week": the top
+30 by total and by daily share 27 rows, and the top 10 share 9. Every song in a 7-day
+window has had about the same number of days on sale, so the two orderings almost
+coincide. The surface therefore obeys the app-wide sort like every other view, default
+total streams, and daily is one change of the select away. A streams-per-day-since-
+release metric was considered and parked (MISC R-8): it would only matter for a wider
+window.
+
+**Re-dated singles, found on the first dated build.** 28 songs sat in the window and
+the top one by total streams was a Taylor Swift single with 265M streams, "released"
+five days earlier: Spotify relinks a single's track ID to the album version when the
+album drops, so the single inherits the album date. Measured `total / (daily * days)`
+across the 28: genuine releases 1 to 9, pre-release singles absorbed into an album 10
+to 18, older songs 35 to 68. `NEW_MAX_DECAY = 10` in `build_pages.py` gates on that
+ratio and cut the pool to 13, dropping 15. The build logs the top five it drops.
+
+**Window.** 7 days ending at the data date. The refresh runs Mondays and releases
+land on Fridays, so the window holds exactly one release day plus its weekend. Wider
+windows are a one-constant change.
+
+Verified locally before the fresh scrape: cleanup and build run end to end, the table
+shows the Released column and the card the Released line in headless Chrome at 1400px
+and 400px, the `?artist=new` deep link renders with a surface-specific empty state.
+**Closing note, 1 October 2026 00:15.** Fresh scrape: 511,148 raw records, 326,703
+songs after cleanup, `data.json.gz` 20,064,077 bytes (76.5% of the cap, up from 75.0%
+with the new field on 4% of rows; expect roughly +1 MB once every row is dated). Raw
+archived as `snapshots/2026-09-30-raw.json.gz`, cleaned as `snapshots/2026-09-30.json.gz`.
+Deployed as version `689c40f1`; verified live: `data/meta.json` carries the new
+vintage, `/new/` returns the page, `data/new.json` holds 13 songs for 23 to 30
+September, `app.js` has the surface, the sitemap lists `/new/`. The local backfill was
+restarted against the fresh scrape and is running at 3/s with no 429s; the committed
+registry is a snapshot of it. See T-4 in `MISC.md` for the one thing left to do when
+it finishes.
+
+Also corrected two stale statements in `CLAUDE.md` noticed while editing: page size is
+30 per device, not 10, and sort applies on change, there is no Apply button.
 
 **R25. Related artists; then the mobile crash report; then "make it 30 on desktop" plus
 the Buy Me a Coffee widget script.**

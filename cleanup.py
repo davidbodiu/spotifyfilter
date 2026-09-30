@@ -4,6 +4,7 @@ Post-scrape cleanup for data.json:
 1. Fixes encoding issues (re-encodes mojibake text)
 2. Deduplicates songs with matching normalized titles and similar stream counts
 3. Computes popularity score (dailyStreams / totalStreams * 1,000,000)
+4. Attaches releaseDate from release_dates.txt (written by release_dates.py)
 """
 
 import json
@@ -13,6 +14,7 @@ import unicodedata
 
 INPUT_FILE = "data.json"
 OUTPUT_FILE = "data.json.gz"
+RELEASE_DATES = "release_dates.txt"  # append-only "<track id> <YYYY-MM-DD>" registry
 STREAM_TOLERANCE = 0.02  # 2% tolerance for matching stream counts
 MIN_TOTAL_STREAMS = 1_000_000  # exclude songs below this threshold
 
@@ -202,8 +204,27 @@ def merge_artists(artist_a, artist_b):
     return "Unknown"
 
 
-def cleanup(songs):
+def load_release_dates():
+    """Track ID -> 'YYYY-MM-DD'. IDs recorded as '-' (no date on Spotify) are skipped."""
+    dates = {}
+    try:
+        with open(RELEASE_DATES, encoding="utf-8") as f:
+            for line in f:
+                parts = line.split()
+                if len(parts) == 2 and parts[1] != "-":
+                    dates[parts[0]] = parts[1]
+    except FileNotFoundError:
+        pass
+    return dates
+
+
+def track_id(url):
+    return (url or "").rsplit("/", 1)[-1]
+
+
+def cleanup(songs, release_dates=None):
     """Run all cleanup steps on the song list."""
+    release_dates = release_dates or {}
     # Step 1: Fix encoding, and guarantee every record has structured artist fields
     for song in songs:
         song["title"] = fix_encoding(song["title"])
@@ -257,6 +278,7 @@ def cleanup(songs):
             else:
                 # Merge: cleanest title, highest streams, combined artists
                 best = cluster[0]
+                best["_urls"] = [best["url"]]
                 for other in cluster[1:]:
                     leads, feats = merge_name_lists(
                         best["leads"], best["features"],
@@ -273,6 +295,7 @@ def cleanup(songs):
                         "totalStreams": max(best["totalStreams"], other["totalStreams"]),
                         "dailyStreams": max(best["dailyStreams"], other["dailyStreams"]),
                         "url": best["url"],
+                        "_urls": best["_urls"] + [other["url"]],
                     }
                 deduped.append(best)
 
@@ -286,6 +309,19 @@ def cleanup(songs):
     # Step 4: Filter by minimum stream threshold
     deduped = [s for s in deduped if s["totalStreams"] >= MIN_TOTAL_STREAMS]
 
+    # Step 5: Release date, from the registry, keyed by track ID. For a merged cluster
+    # take the earliest date among its members. Omitted (not null) when unknown, so
+    # the artifact does not pay for the field on every undated row.
+    dated = 0
+    for song in deduped:
+        urls = song.pop("_urls", None) or [song["url"]]
+        found = [release_dates[t] for t in map(track_id, urls) if t in release_dates]
+        if found:
+            song["releaseDate"] = min(found)
+            dated += 1
+    print(f"Release dates: {dated:,} of {len(deduped):,} songs dated "
+          f"({dated / max(len(deduped), 1):.1%}); registry holds {len(release_dates):,}.")
+
     # Sort by total streams descending
     deduped.sort(key=lambda s: s["totalStreams"], reverse=True)
     return deduped
@@ -296,7 +332,7 @@ def main():
         songs = json.load(f)
     print(f"Loaded {len(songs)} songs.")
 
-    cleaned = cleanup(songs)
+    cleaned = cleanup(songs, load_release_dates())
 
     removed = len(songs) - len(cleaned)
     print(f"Removed {removed} duplicates. Final count: {len(cleaned)} songs.")

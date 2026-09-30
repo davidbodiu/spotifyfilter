@@ -10,6 +10,8 @@ Outputs, all under public/:
   data/artists.json          artist index: name, slug, song count
   data/artist/<slug>.json    that artist's songs (the only payload a page needs)
   data/global.json           precomputed top-N for each sort, for the global chart
+  data/new.json              songs released in the last NEW_RELEASE_DAYS, with the window
+  new/index.html             crawlable "new releases" page
   artist/<slug>/index.html   crawlable page with real text
   artists/index.html         A-Z hub linking every artist
   sitemap.xml
@@ -21,6 +23,7 @@ its own URL, its backlinks and its rankings, so once a name has a slug that pair
 never reassigned, even if the slugify rules later change.
 """
 
+import datetime
 import gzip
 import hashlib
 import json
@@ -43,6 +46,27 @@ POP_MIN_DAILY = 400_000  # global POPULARITY chart only (SD-23, R31). popularity
                          # songs qualify, so this chart intentionally overlaps the
                          # daily chart heavily. Per-artist sorting is untouched.
 SORTS = ("totalStreams", "dailyStreams", "popularity")
+
+# New releases (R33). Songs whose releaseDate falls within this many days of the data
+# date, i.e. the scrape date. The refresh runs Mondays and releases land on Fridays, so
+# 7 days spans exactly one release day plus its weekend. releaseDate is the album date
+# Spotify attaches to the track, taken as the earliest across a merged cluster
+# (cleanup.py). Unknown dates simply do not qualify.
+NEW_RELEASE_DAYS = 7
+NEW_CAP = 1000          # the pool is tens to low hundreds; the cap is a safety rail
+
+# Plausibility gate for the new-releases pool. Spotify's release date is the ALBUM
+# date of the track's canonical version, and when a single is folded into an album
+# Spotify relinks the single's ID to the album version, so the single inherits the
+# album date. Measured on the first dated build (30 September 2026): 28 candidates in
+# the window, of which a 265M-stream single "released" five days earlier topped the
+# list, and about half were pre-release singles or older songs re-dated by an album.
+#
+# The gate is physical: a song D days on sale cannot have streamed more than D times
+# its peak day. Allowing the current day to be a NEW_MAX_DECAY-fold decay from the
+# average, accept only totalStreams <= NEW_MAX_DECAY * D * dailyStreams. Genuine new
+# releases measured 1 to 9; pre-release singles 10 to 18; older songs 35 to 68.
+NEW_MAX_DECAY = 10
 
 # Same floating widget as the main app, so it appears on the SEO landing pages too.
 BMC_WIDGET = (
@@ -103,7 +127,8 @@ def page_html(name, slug, songs, collaborators):
     rows = "\n".join(
         f'      <tr><td>{i}</td><td>{esc(s["title"])}</td>'
         f'<td>{esc(s["artist"])}</td>'
-        f'<td>{s["totalStreams"]:,}</td><td>{s["dailyStreams"]:,}</td></tr>'
+        f'<td>{s["totalStreams"]:,}</td><td>{s["dailyStreams"]:,}</td>'
+        f'<td>{esc(s.get("releaseDate", ""))}</td></tr>'
         for i, s in enumerate(top, 1))
 
     links = " ".join(
@@ -174,7 +199,7 @@ def page_html(name, slug, songs, collaborators):
 
   <div class="table-wrapper">
     <table>
-      <thead><tr><th>#</th><th>Title</th><th>Artist</th><th>Total streams</th><th>Daily streams</th></tr></thead>
+      <thead><tr><th>#</th><th>Title</th><th>Artist</th><th>Total streams</th><th>Daily streams</th><th>Released</th></tr></thead>
       <tbody>
 {rows}
       </tbody>
@@ -183,6 +208,102 @@ def page_html(name, slug, songs, collaborators):
   {"<p class='page-lede'>Showing the top %d of %d. <a href='/?artist=%s'>See all</a>.</p>" % (SONGS_ON_PAGE, len(songs), slug) if len(songs) > SONGS_ON_PAGE else ""}
 
   {f'<p class="page-lede">Often appears with: {links}</p>' if links else ''}
+</div>
+{BMC_WIDGET}
+</body>
+</html>
+"""
+
+
+def new_releases(songs, data_date):
+    """Songs released within NEW_RELEASE_DAYS of data_date that pass the plausibility
+    gate, by total streams, plus the candidates the gate dropped (for the log)."""
+    since = data_date - datetime.timedelta(days=NEW_RELEASE_DAYS)
+    since_s = since.isoformat()
+    pool, dropped = [], []
+    for s in songs:
+        rd = s.get("releaseDate", "")
+        if rd < since_s:
+            continue
+        days = max((data_date - datetime.date.fromisoformat(rd)).days + 1, 1)
+        if s["totalStreams"] > NEW_MAX_DECAY * days * s["dailyStreams"]:
+            dropped.append(s)
+        else:
+            pool.append(s)
+    pool.sort(key=lambda s: -s["totalStreams"])
+    dropped.sort(key=lambda s: -s["totalStreams"])
+    return since, pool[:NEW_CAP], dropped
+
+
+def new_page_html(pool, since, data_date):
+    top = pool[:SONGS_ON_PAGE]
+    rows = "\n".join(
+        f'      <tr><td>{i}</td><td>{esc(s["title"])}</td>'
+        f'<td>{esc(s["artist"])}</td>'
+        f'<td>{s["totalStreams"]:,}</td><td>{s["dailyStreams"]:,}</td>'
+        f'<td>{esc(s["releaseDate"])}</td></tr>'
+        for i, s in enumerate(top, 1))
+    desc = (f"The most streamed songs released on Spotify in the last {NEW_RELEASE_DAYS} "
+            f"days, ranked by total and daily streams. Updated weekly.")
+    ld = {
+        "@context": "https://schema.org",
+        "@type": "ItemList", "name": "New releases ranked by Spotify streams",
+        "numberOfItems": len(top), "itemListElement": [
+            {"@type": "ListItem", "position": i,
+             "item": {"@type": "MusicRecording", "name": s["title"],
+                      "datePublished": s["releaseDate"], "url": s["url"]}}
+            for i, s in enumerate(top, 1)],
+    }
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>New Releases Ranked by Spotify Streams | ChartRank</title>
+<meta name="description" content="{esc(desc)}">
+<link rel="canonical" href="{SITE}/new/">
+<meta name="color-scheme" content="light dark">
+<meta property="og:type" content="website">
+<meta property="og:url" content="{SITE}/new/">
+<meta property="og:title" content="New Releases Ranked by Spotify Streams">
+<meta property="og:description" content="{esc(desc)}">
+<meta property="og:image" content="{SITE}/og-image.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="/favicon.ico" sizes="32x32">
+<link rel="icon" href="/icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../styles.css">
+<script type="application/ld+json">{json.dumps(ld, ensure_ascii=False)}</script>
+</head>
+<body>
+<div class="app">
+  <header class="header">
+    <div class="logo">
+      <svg class="logo-mark" viewBox="0 0 24 24" width="32" height="32" aria-hidden="true">
+        <rect x="3" y="13" width="4.5" height="8" rx="1.5"/>
+        <rect x="9.75" y="8" width="4.5" height="13" rx="1.5"/>
+        <rect x="16.5" y="3" width="4.5" height="18" rx="1.5"/>
+      </svg>
+      <h1>ChartRank</h1>
+    </div>
+  </header>
+
+  <nav class="crumbs"><a href="/">Home</a> / New releases</nav>
+
+  <h2 class="page-title">New releases: the most streamed songs of the last {NEW_RELEASE_DAYS} days</h2>
+  <p class="page-lede">{len(pool)} songs released between {since.isoformat()} and
+     {data_date.isoformat()} with at least a million streams.
+     <a href="/?artist=new">Open in the interactive chart</a> to sort by daily plays
+     and play previews.</p>
+
+  <div class="table-wrapper">
+    <table>
+      <thead><tr><th>#</th><th>Title</th><th>Artist</th><th>Total streams</th><th>Daily streams</th><th>Released</th></tr></thead>
+      <tbody>
+{rows}
+      </tbody>
+    </table>
+  </div>
+  {"<p class='page-lede'>Showing the top %d of %d. <a href='/?artist=new'>See all</a>.</p>" % (SONGS_ON_PAGE, len(pool)) if len(pool) > SONGS_ON_PAGE else ""}
 </div>
 {BMC_WIDGET}
 </body>
@@ -207,7 +328,7 @@ def main():
     print(f"Slug registry: {len(registry):,} names ({added} new).")
 
     # Rebuild only the generated trees, never the hand-written files beside them.
-    for sub in ("artist", "artists", "data"):
+    for sub in ("artist", "artists", "data", "new"):
         shutil.rmtree(os.path.join(OUT, sub), ignore_errors=True)
     os.makedirs(f"{OUT}/data/artist", exist_ok=True)
     os.makedirs(f"{OUT}/artists", exist_ok=True)
@@ -246,12 +367,35 @@ def main():
     # Data-vintage stamp, read by deploy.sh. The mtime of data.json.gz is the marker:
     # a stale local pipeline keeps an old mtime, so deploying it over fresher live data
     # can be caught before it happens (that exact regression shipped once, R29).
+    data_epoch = int(os.path.getmtime(DATA))
     meta = {
         "songs": len(songs),
-        "dataEpoch": int(os.path.getmtime(DATA)),
+        "dataEpoch": data_epoch,
     }
     with open(f"{OUT}/data/meta.json", "w", encoding="utf-8") as f:
         json.dump(meta, f)
+
+    # New releases: a window over releaseDate ending at the data date, one file, the
+    # client sorts. Ships the window so the app can say what "new" means.
+    data_date = datetime.datetime.fromtimestamp(data_epoch, datetime.timezone.utc).date()
+    since, pool, dropped = new_releases(songs, data_date)
+    dated = sum(1 for s in songs if "releaseDate" in s)
+    print(f"Release dates on {dated:,} of {len(songs):,} songs; "
+          f"{len(pool):,} released since {since} (data date {data_date}), "
+          f"{len(dropped):,} re-dated older songs dropped by the plausibility gate.")
+    for s in dropped[:5]:
+        print(f"  dropped: {s['totalStreams']:,} total, {s['dailyStreams']:,} daily, "
+              f"dated {s['releaseDate']}: {s['title']} / {s['artist']}")
+    if not pool:
+        print("::warning::No songs qualify as new releases. release_dates.py may have "
+              "failed, or the registry is missing this week's IDs.")
+    with open(f"{OUT}/data/new.json", "w", encoding="utf-8") as f:
+        json.dump({"since": since.isoformat(), "until": data_date.isoformat(),
+                   "days": NEW_RELEASE_DAYS, "songs": pool},
+                  f, ensure_ascii=False, separators=(",", ":"))
+    os.makedirs(f"{OUT}/new", exist_ok=True)
+    with open(f"{OUT}/new/index.html", "w", encoding="utf-8") as f:
+        f.write(new_page_html(pool, since, data_date))
 
     # Global chart: the top N by each sort are different sets, so precompute all three.
     glob = {}
@@ -289,7 +433,8 @@ def main():
 </div></body></html>
 """)
 
-    urls = [f"{SITE}/", f"{SITE}/artists/"] + [f"{SITE}/artist/{e['s']}/" for e in index]
+    urls = ([f"{SITE}/", f"{SITE}/artists/", f"{SITE}/new/"]
+            + [f"{SITE}/artist/{e['s']}/" for e in index])
     with open(f"{OUT}/sitemap.xml", "w", encoding="utf-8") as f:
         f.write('<?xml version="1.0" encoding="UTF-8"?>\n'
                 '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n')

@@ -13,6 +13,7 @@ snapshots/
 # that was ever committed. So it is regenerated on every deploy instead.
 public/artist/
 public/artists/
+public/new/
 public/data/
 public/sitemap.xml
 

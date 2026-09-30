@@ -456,6 +456,83 @@ directly" convention. It does mean thousands of small files in the repo.
 Worth doing only if load time is a real complaint. Flagging as an option, not a
 recommendation to act on now.
 
+### R-7. Release date per song `RESOLVED` (embed page, SD-24)
+
+**DECIDED R33.** The user delegated the choice to research. The Web API option died on
+inspection: Development Mode needs Premium, batch `GET /tracks` was removed in
+February 2026, Client Credentials is being retired for metadata. Embed page chosen and
+built. See R33 in `requests.md` for the measurements. Original analysis kept below.
+
+
+Asked by the user in R32. kworb does not publish it anywhere the scraper visits; its
+per-track page only has chart-entry dates. Two real sources, both one lookup per
+Spotify track ID, keyed on the `url` field the records already carry:
+
+1. **Spotify embed page** (`open.spotify.com/embed/track/<id>`): the `__NEXT_DATA__`
+   JSON carries `releaseDate.isoString`. Verified on 3 tracks: no auth, no UA needed,
+   ~10 KB per fetch. Undocumented, so it can break silently; needs a parse-failure
+   alarm in CI. One request per song: ~40 to 70 h for a cold backfill of 323k at the
+   scraper's politeness delay.
+2. **Spotify Web API** `/v1/tracks?ids=` (50 IDs per call): `album.release_date` plus
+   `release_date_precision` (day/month/year). Stable and documented, but needs a
+   developer app, a client secret in GitHub Actions secrets, and a token refresh.
+   ~6.5k calls for a cold backfill, a few hours with rate limiting.
+
+Either way the date should live in a separate cache keyed by track ID (like
+`slugs.json`, append-only) so the weekly run only fetches new IDs, and so the value
+survives `cleanup.py`'s URL merges. Note the API date is the album's date: a single
+later re-released on a deluxe edition may show the album's date, and dedup merges can
+pick the re-release URL (R-4 territory), so "earliest date across the merged cluster"
+is the safer rule. Adds one string per record to `data.json.gz`, currently at 75% of
+the 25 MiB cap; roughly +2 to 3 MB uncompressed, well under 1 MB compressed.
+
+### I-8. Spotify's track release date is the canonical album's date, so singles get re-dated `INSIGHT`
+
+Found on the first dated build (R33). A Taylor Swift single with 265M streams carried
+a release date five days old, because its album dropped that day and Spotify relinks
+the single's track ID to the album version. Of 28 songs in the 7-day window, 15 were
+re-dated: pre-release singles (implied decay 10 to 18x) and genuinely old songs (35 to
+68x). `NEW_MAX_DECAY` in `build_pages.py` gates on `total <= 10 * days * daily`. The
+threshold sits in the gap between genuine releases (1 to 9x) and absorbed singles; if
+the pool ever looks wrong, print the dropped list (the build logs the top five) and
+re-measure before moving it. The gate also means a re-dated song stays out even after
+the backfill dates its original URL, so `cleanup.py`'s earliest-across-cluster rule is
+a second line, not the first.
+
+### R-8. New-releases ranking could normalise for days on sale `OPEN` `LOW`
+
+The surface ranks by the app-wide sort (total by default). Within a 7-day window the
+orderings by total and by daily nearly coincide (27/30 overlap measured in R33), so
+this does not matter today. If `NEW_RELEASE_DAYS` is ever widened to 30, a Tuesday
+release would carry 4x the total of one from the following Friday, and a fairer key
+would be `totalStreams / days_since_release`. That needs a new sort key in
+`build_pages.py` and `app.js`, and a decision on whether it replaces or joins the
+three sorts.
+
+### G-15. Release-date failures degrade silently to a stale new-releases page `OPEN` `LOW`
+
+By design (R33): the CI step is `continue-on-error` so a change to Spotify's embed
+page cannot block the weekly stream refresh. The consequence is that if
+`release_dates.py` starts failing, the step turns red inside a green run,
+`build_pages.py` prints a `::warning::` when the pool is empty, and the live `/new/`
+page shows an empty state until someone looks. Nobody is notified. A cheap upgrade is
+a `workflow_run`-triggered notification or a check in the sanity step that fails when
+the pool is empty for two consecutive weeks (needs state).
+
+### G-16. `release_dates.txt` is ~11 MB of committed text once the backfill lands `OPEN` `INFO`
+
+332k lines at ~34 bytes. Chosen over gzip deliberately: git delta-compresses appended
+plain text, so weekly commits cost ~50 KB, whereas a rewritten binary blob would cost
+~5 MB each week. The one-off cost is the first commit. If it ever needs to move, the
+registry is regenerable from the embed page at ~31 hours.
+
+### G-17. The data date is `data.json.gz`'s mtime, not the scrape date `OPEN` `TRIVIAL`
+
+`build_pages.py` derives the new-releases window from the mtime `deploy.sh` already
+uses as the vintage. Locally, running `cleanup.py` days after `scrape.py` shifts the
+window forward by those days. In CI they are minutes apart. Stamping the scrape date
+into `data.json` would fix it properly.
+
 ### R-6. Global popularity chart ranks denominator noise `RESOLVED` (option A)
 
 Raised by the user in R30. `popularity = daily/total * 1e6` explodes when the
@@ -517,6 +594,23 @@ site and must stay disabled.
 ---
 
 ## Todos
+
+### T-4. Commit the finished release-date backfill before Monday's CI run `OPEN` `HIGH`
+
+The full backfill (~324k IDs, ~31 hours at 3/s) was started locally on 30 September
+at 23:55 and appends to `release_dates.txt` every 200 results. The commit from R33
+holds an early snapshot of the registry. CI will append its own lines to the same
+file on Monday 5 October at 04:10 UTC and commit them, and two different tails on an
+append-only file conflict on the next pull. So, when the local run ends (check with
+`pgrep -f release_dates.py`; the log ends with "Fetched ..."):
+
+```bash
+git add release_dates.txt && git commit -m "data: release-date backfill" && git push
+```
+
+Do it before Monday. If Monday comes first, resolve the conflict by concatenating both
+sides and deduplicating on the first column; every line is independent. Once the
+registry is complete the weekly step fetches only the ~1,650 new IDs (~10 min).
 
 ### T-3. Nothing from this session is committed or pushed `OPEN` `HIGH`
 

@@ -537,6 +537,17 @@ td:first-child {
   text-align: right;
 }
 
+.col-date {
+  min-width: 120px;
+  text-align: right;
+}
+
+.date-cell {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+}
+
 .col-preview {
   min-width: 320px;
   text-align: center;
