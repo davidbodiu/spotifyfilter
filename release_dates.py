@@ -40,6 +40,7 @@ RELEASE_DATES_PACE (requests per second).
 
 import concurrent.futures
 import gzip
+import http.client
 import json
 import os
 import re
@@ -147,7 +148,9 @@ def fetch_one(tid):
             wait = float(e.headers.get("Retry-After") or 0) or PAUSE_ON_429 * (attempt + 1)
             print(f"  HTTP 429 for {tid}; pausing all workers {wait:.0f}s", flush=True)
             pacer.pause(wait)
-        except (urllib.error.URLError, TimeoutError, OSError) as e:
+        except (urllib.error.URLError, http.client.HTTPException, TimeoutError, OSError):
+            # http.client.IncompleteRead is an HTTPException, not an OSError; one of
+            # them escaping a worker thread killed a 322k-ID backfill at 51k.
             time.sleep(2 * (2 ** attempt))
     return tid, None
 
