@@ -730,3 +730,15 @@ Updated after every request. See the maintenance protocol in `CLAUDE.md`.
         |
   (( awaiting choice, G-18 ))
 ```
+
+## R36, 1 October: "sure let's do option 1"
+
+```
+  (( choice: title markers ))
+        |
+        [ NEW_EDITION_MARKERS regex, applied beside the decay gate ]
+        [ rebuild ] --> 12 in pool, remix gone, nothing else moved
+        [ deploy ] [ verify live ]
+        |
+  (( G-18 resolved ))
+```

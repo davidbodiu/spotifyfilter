@@ -486,7 +486,10 @@ pick the re-release URL (R-4 territory), so "earliest date across the merged clu
 is the safer rule. Adds one string per record to `data.json.gz`, currently at 75% of
 the 25 MiB cap; roughly +2 to 3 MB uncompressed, well under 1 MB compressed.
 
-### G-18. New editions of old songs pass the new-releases gate `OPEN` `DECISION`
+### G-18. New editions of old songs pass the new-releases gate `RESOLVED` (title markers, R36)
+
+**DECIDED R36: option 1.** `NEW_EDITION_MARKERS` excludes edition titles. The known
+cost is that a genuinely new remix is hidden. Original analysis below.
 
 R35: "ALL WHITE REMIX ... - BONUS TRACK" (De La Ghetto, Brray), a month-old song whose
 bonus-track edition is dated 24 September by Spotify, ranked #13. Decay ratio 7.0,

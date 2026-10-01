@@ -68,6 +68,16 @@ NEW_CAP = 1000          # the pool is tens to low hundreds; the cap is a safety 
 # releases measured 1 to 9; pre-release singles 10 to 18; older songs 35 to 68.
 NEW_MAX_DECAY = 10
 
+# Edition markers (R35, G-18). A new edition of an old song gets a new track ID and a
+# new release date, and accumulates streams exactly like a new release, so neither the
+# decay gate nor a history check can see it: a month-old remix's "BONUS TRACK" edition
+# ranked #13 with a decay ratio of 7.0. Titles carrying these markers are excluded
+# from the new-releases pool. The cost, accepted by the user, is that a genuinely new
+# remix released this week is hidden too. Case-insensitive, whole words.
+NEW_EDITION_MARKERS = re.compile(
+    r"\b(remix|bonus|reimagined|deluxe|live|acoustic|sped up|slowed|version|edit|"
+    r"remaster|remastered|instrumental|demo)\b", re.I)
+
 # Same floating widget as the main app, so it appears on the SEO landing pages too.
 BMC_WIDGET = (
     '<script data-name="BMC-Widget" data-cfasync="false" src="https://cdnjs.buymeacoffee.com/1.0.0/widget.prod.min.js" data-id="david2000" data-description="Support me on Buy me a coffee!" data-message="" data-color="#40DCA5" data-position="Right" data-x_margin="18" data-y_margin="18"></script>'
@@ -226,7 +236,8 @@ def new_releases(songs, data_date):
         if rd < since_s:
             continue
         days = max((data_date - datetime.date.fromisoformat(rd)).days + 1, 1)
-        if s["totalStreams"] > NEW_MAX_DECAY * days * s["dailyStreams"]:
+        if (s["totalStreams"] > NEW_MAX_DECAY * days * s["dailyStreams"]
+                or NEW_EDITION_MARKERS.search(s["title"])):
             dropped.append(s)
         else:
             pool.append(s)
@@ -382,7 +393,7 @@ def main():
     dated = sum(1 for s in songs if "releaseDate" in s)
     print(f"Release dates on {dated:,} of {len(songs):,} songs; "
           f"{len(pool):,} released since {since} (data date {data_date}), "
-          f"{len(dropped):,} re-dated older songs dropped by the plausibility gate.")
+          f"{len(dropped):,} dropped (re-dated older songs, new editions of old songs).")
     for s in dropped[:5]:
         print(f"  dropped: {s['totalStreams']:,} total, {s['dailyStreams']:,} daily, "
               f"dated {s['releaseDate']}: {s['title']} / {s['artist']}")

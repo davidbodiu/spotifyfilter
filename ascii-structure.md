@@ -138,7 +138,8 @@ data.json.gz .................... 321,878 songs, 19.6 MB, gitignored
    |    co-occurrence map .............. 12 collaborator links per page
    |    page_html() .................... 50 songs as text + MusicGroup/
    |                                     BreadcrumbList/ItemList JSON-LD
-   |    new_releases() ................. releaseDate >= data date - NEW_RELEASE_DAYS
+   |    new_releases() ................. releaseDate >= data date - NEW_RELEASE_DAYS,
+   |                                     decay gate, NEW_EDITION_MARKERS
    |    new_page_html() ................ /new/ with datePublished JSON-LD
    v
 public/{artist,artists,new,data,sitemap.xml}

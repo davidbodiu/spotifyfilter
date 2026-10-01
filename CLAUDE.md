@@ -327,6 +327,13 @@ pool to 13. The earliest-across-cluster rule in `cleanup.py` only helps once the
 backfill has dated the older URL, so the gate is what holds in the meantime and for
 singles whose original ID never appears separately.
 
+**Edition markers are excluded too** (`NEW_EDITION_MARKERS`, R35/R36). A new edition
+of an old song (a "BONUS TRACK" remix, a "Reimagined" cut) gets a new ID and a new
+date and streams exactly like a new release, so the decay gate cannot see it. Titles
+containing remix, bonus, reimagined, deluxe, live, acoustic, sped up, slowed, version,
+edit, remaster, instrumental or demo are dropped from the pool. The user accepted that
+a genuinely new remix is hidden as a result.
+
 The surface obeys the app-wide sort select like everything else. Measured on the
 10 August data: the top 30 by total and by daily streams among freshly released songs
 share 27 rows, because every song in a 7-day window has roughly the same number of
@@ -427,6 +434,7 @@ full value is available on hover. Applied at 45 chars for title, 35 for artist.
 | `PAGE_SIZE_DESKTOP` / `PAGE_SIZE_MOBILE` | app.js | 30 / 30 | 10 in March (SD-3), 50 broke mobile (R25), 30 since |
 | `NEW_RELEASE_DAYS` | build_pages.py | 7 | Window for the new-releases surface (SD-24) |
 | `NEW_MAX_DECAY` | build_pages.py | 10 | Plausibility gate: total <= 10 x days x daily, else the date is an album re-date |
+| `NEW_EDITION_MARKERS` | build_pages.py | regex | Titles of new editions of old songs are excluded from the pool |
 | `PACE` | release_dates.py | 2.0 | Embed fetches per second; 9/s drew 429s |
 | `MAX_FETCHES` | release_dates.py | 5000 | Per-run budget; env `RELEASE_DATES_MAX` overrides |
 | `DEFAULT_ARTIST` | app.js | 'Billie Eilish' | Must match `PRELOAD` |

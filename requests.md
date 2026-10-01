@@ -41,7 +41,7 @@ silently.
 | SD-21 | `slugs.json` is append-only. A name's slug is never reassigned. | R19 | A changed slug destroys its own URL, backlinks and rankings. |
 | SD-22 | Spotify embeds are left exactly as they are, dark in both themes. | R19 | Verified: no light embed exists. User chose to leave it. |
 | SD-23 | The global **popularity** chart only ranks songs with >= 400k daily streams (`POP_MIN_DAILY`). Other sorts and per-artist views are unfiltered. | R31 | popularity = daily/total explodes near the 1M total floor; user chose a daily floor over a total floor or damped ratio. |
-| SD-24 | Release dates come from the Spotify **embed page**, one fetch per track ID, into `release_dates.txt`, which is append-only and committed. The new-releases surface is a 7-day window (`NEW_RELEASE_DAYS`) behind a plausibility gate (`NEW_MAX_DECAY`, since Spotify re-dates singles to their album) and obeys the app-wide sort. | R33 | The Web API now needs Premium, lost batch `GET /tracks` and is retiring Client Credentials for metadata; the embed page needs nothing. User delegated the choice to research (R33) after the options were laid out in R32. |
+| SD-24 | Release dates come from the Spotify **embed page**, one fetch per track ID, into `release_dates.txt`, which is append-only and committed. The new-releases surface is a 7-day window (`NEW_RELEASE_DAYS`) behind a plausibility gate (`NEW_MAX_DECAY`, since Spotify re-dates singles to their album) and an edition-marker exclusion (`NEW_EDITION_MARKERS`, R36), and obeys the app-wide sort. | R33, R36 | The Web API now needs Premium, lost batch `GET /tracks` and is retiring Client Credentials for metadata; the embed page needs nothing. User delegated the choice to research (R33) after the options were laid out in R32. |
 
 ---
 
@@ -901,6 +901,14 @@ nor a history check can separate it. This is the residual class the R33 gate doe
 cover: a new edition of an older song that accumulates streams exactly like a new
 release. Options presented per SD-12 (tighten the gate, a title-marker exclusion, or
 accept Spotify's definition); awaiting the user's choice. Recorded as G-18.
+
+**R36. "sure let's do option 1"**
+
+`NEW_EDITION_MARKERS` in `build_pages.py`: titles containing remix, bonus, reimagined,
+deluxe, live, acoustic, sped up, slowed, version, edit, remaster, instrumental or demo
+are dropped from the new-releases pool, alongside the decay gate. Rebuilt: 12 songs,
+the bonus-track remix gone, nothing else affected. Deployed and verified live. SD-24
+amended to mention the exclusion.
 
 **R25. Related artists; then the mobile crash report; then "make it 30 on desktop" plus
 the Buy Me a Coffee widget script.**
