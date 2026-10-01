@@ -888,6 +888,20 @@ Found while measuring: the local backfill had died at 51k of 322k IDs on an
 `OSError`). Fixed, restarted, committed as `2b38e75` and pushed. Also corrected the
 `CLAUDE.md` claim that the 25 MiB cap applies to `data.json.gz`.
 
+**R35. Screenshot of "ALL WHITE REMIX (feat. Conep, VEI HABACHE) - BONUS" at #13 in new
+releases, dated 24 Sep 2026: "This song was released over a month ago, but now appears
+in the new releases tab..."**
+
+Diagnosed, no code changed. The track ID in the dataset is the "BONUS TRACK" edition,
+and Spotify's embed page genuinely dates that ID 24 September: the song is a month old,
+the edition is a week old. The ID is absent from every local snapshot (the original
+never reached 1M streams, so it was never in the dataset), and its decay ratio is 7.0,
+inside the band genuine album tracks occupy (1 to 9), so neither the plausibility gate
+nor a history check can separate it. This is the residual class the R33 gate does not
+cover: a new edition of an older song that accumulates streams exactly like a new
+release. Options presented per SD-12 (tighten the gate, a title-marker exclusion, or
+accept Spotify's definition); awaiting the user's choice. Recorded as G-18.
+
 **R25. Related artists; then the mobile crash report; then "make it 30 on desktop" plus
 the Buy Me a Coffee widget script.**
 

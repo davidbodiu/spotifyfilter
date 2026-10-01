@@ -714,3 +714,19 @@ Updated after every request. See the maintenance protocol in `CLAUDE.md`.
         |
   (( backfill running again ))
 ```
+
+## R35, 1 October: screenshot, month-old remix in new releases
+
+```
+  (( problem report ))
+        |
+        [ look up the ID ] --> "- BONUS TRACK" edition, embed date 24 Sep, genuine
+        [ snapshots ] --> absent from Mar, Jul, Aug: never had 1M streams before
+        [ ratio/D ] --> 7.0, inside the genuine band (1-9)
+        |
+        !!! residual class: new edition of an old song, streams like a release
+        |
+        [ options: tighten gate / title markers / accept ]   *** SD-12
+        |
+  (( awaiting choice, G-18 ))
+```

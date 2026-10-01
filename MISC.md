@@ -486,6 +486,18 @@ pick the re-release URL (R-4 territory), so "earliest date across the merged clu
 is the safer rule. Adds one string per record to `data.json.gz`, currently at 75% of
 the 25 MiB cap; roughly +2 to 3 MB uncompressed, well under 1 MB compressed.
 
+### G-18. New editions of old songs pass the new-releases gate `OPEN` `DECISION`
+
+R35: "ALL WHITE REMIX ... - BONUS TRACK" (De La Ghetto, Brray), a month-old song whose
+bonus-track edition is dated 24 September by Spotify, ranked #13. Decay ratio 7.0,
+inside the genuine band, and the ID is new to the dataset, so neither the gate nor a
+first-seen check applies. Candidates: tighten `NEW_MAX_DECAY` (5 would catch it but
+also drop six likely-genuine album tracks measured at 5.7 to 8.6); exclude titles
+carrying edition markers (remix, bonus, reimagined, deluxe, live, acoustic, sped up,
+slowed, version, edit, remaster), which catches this and the Ben&Ben "Reimagined"
+pair at the cost of hiding genuinely new remixes; or accept that Spotify's release
+date is per edition and say so on the page.
+
 ### B-20. Release-date backfill died on an uncaught `IncompleteRead` `FIXED`
 
 Found in R34: the local backfill log ended with `http.client.IncompleteRead` at 51k of
