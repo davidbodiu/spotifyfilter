@@ -486,6 +486,23 @@ pick the re-release URL (R-4 territory), so "earliest date across the merged clu
 is the safer rule. Adds one string per record to `data.json.gz`, currently at 75% of
 the 25 MiB cap; roughly +2 to 3 MB uncompressed, well under 1 MB compressed.
 
+### B-20. Release-date backfill died on an uncaught `IncompleteRead` `FIXED`
+
+Found in R34: the local backfill log ended with `http.client.IncompleteRead` at 51k of
+322k IDs. `fetch_one()` caught `URLError`, `TimeoutError` and `OSError`, but
+`IncompleteRead` is an `http.client.HTTPException`, which is not an `OSError`, and an
+exception escaping a worker thread ends `ex.map()` and the run. Now caught alongside
+the others; state was intact because every 200 results are flushed. Fixed in
+`2b38e75`.
+
+### I-9. The 25 MiB size gate on `data.json.gz` is vestigial `INSIGHT`
+
+`data.json.gz` has not been a deployed file since the shard split (SD-19); the Worker
+serves `public/`, where the largest file is `global.json` at 696 KB. The CI size gate
+and the "deploy ceiling" language date from when the monolith shipped. The gate costs
+nothing and still catches a runaway artifact, so it stays, but the number is not a
+deployment constraint any more. `CLAUDE.md` corrected in R34.
+
 ### I-8. Spotify's track release date is the canonical album's date, so singles get re-dated `INSIGHT`
 
 Found on the first dated build (R33). A Taylor Swift single with 265M streams carried

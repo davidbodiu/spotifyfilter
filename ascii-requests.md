@@ -695,3 +695,22 @@ Updated after every request. See the maintenance protocol in `CLAUDE.md`.
         |
   (( release dates on every song; /new/ live ))
 ```
+
+## R34, 1 October: "cost implications now and in the future?"
+
+```
+  (( question ))
+        |
+        [ measure ] --> repo public => Actions minutes + artifacts free
+        |               Worker free plan, 6,014 files of 20,000, 158 MB
+        |               registry 34 B/line: 10.9 MB complete, +56 KB/week
+        |               data.json.gz 20.06 -> ~21.35 MB fully dated; NOT deployed
+        |               CI runs 81-91 min; +10 min/week steady, +33 min while backfilling
+        |
+        !!! backfill log ends in http.client.IncompleteRead at 51k/322k
+        [ fix: catch HTTPException ] [ restart ] [ commit 2b38e75 + push ]
+        |
+        [ answer: zero money; time and bytes quantified; one paid fallback path ]
+        |
+  (( backfill running again ))
+```

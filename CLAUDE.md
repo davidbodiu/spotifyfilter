@@ -91,9 +91,11 @@ exist **only** in the raw snapshot. Future stream deltas must be computed agains
 pre-merge track IDs, because the 2% clustering can change which URL represents a song
 between runs.
 
-**Deploy ceiling: 25 MiB (26,214,400 bytes) per file.** The artifact is at 67% of that
-today and projected to reach 70 to 75% once `leads`/`features` ship. Gate every refresh
-on `wc -c data.json.gz` before deploying.
+**The 25 MiB (26,214,400 bytes) per-file deploy cap no longer binds `data.json.gz`.**
+It stopped being a deployed file at the shard split (SD-19); the largest deployed file
+is `data/global.json` at ~700 KB. The CI size gate on it is kept as a runaway check
+only. Measured 1 October 2026: 20.06 MB with 4% of rows dated, ~21.35 MB once every
+row is (I-9).
 
 | Metric | Value |
 |---|---|

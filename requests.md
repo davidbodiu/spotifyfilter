@@ -868,6 +868,26 @@ it finishes.
 Also corrected two stale statements in `CLAUDE.md` noticed while editing: page size is
 30 per device, not 10, and sort applies on change, there is no Apply button.
 
+**R34. "What are the cost implications of this now and in the future?"**
+
+Question, answered with measurements (1 October 2026). Money: none, now or projected.
+The repo is public, so Actions minutes and artifact storage are free; the Worker is on
+the free plan and static asset requests are not metered. Measured costs are time and
+bytes: CI gains ~10 min a week once the backfill is complete (1,650 IDs at 3/s), up to
+33 min while it is not, on top of runs that already take 81 to 91 min (job timeout 180).
+`release_dates.txt` is 10.9 MB of text when complete, ~6.4 MB in git, growing 56 KB a
+week. `data.json.gz` goes from 20.06 MB to ~21.35 MB when every row is dated, which no
+longer matters for deployment because it has not been a deployed file since the shard
+split (SD-19): the largest deployed file is `global.json` at 696 KB. The embed fetches
+cost ~3.5 GB of transfer once and ~18 MB a week. The only path to a monetary cost is
+Spotify closing the embed page, where the fallback is the Web API behind a Premium
+subscription.
+
+Found while measuring: the local backfill had died at 51k of 322k IDs on an
+`http.client.IncompleteRead` that the fetcher did not catch (`HTTPException` is not an
+`OSError`). Fixed, restarted, committed as `2b38e75` and pushed. Also corrected the
+`CLAUDE.md` claim that the 25 MiB cap applies to `data.json.gz`.
+
 **R25. Related artists; then the mobile crash report; then "make it 30 on desktop" plus
 the Buy Me a Coffee widget script.**
 
