@@ -910,6 +910,16 @@ are dropped from the new-releases pool, alongside the decay gate. Rebuilt: 12 so
 the bonus-track remix gone, nothing else affected. Deployed and verified live. SD-24
 amended to mention the exclusion.
 
+**R37. "Progress report?"** (new session, model switched to Opus 5.5)
+
+Status only. The local backfill was at 250,402 of 285,270 IDs on 2 October at 09:46,
+3.0/s, zero 429s in 22 hours (one grep hit for "429" was the digits of an ETA), about
+3 hours remaining. Registry 301,391 lines, 128 of them undated. Every commit is
+pushed; the only working-tree change is the growing registry, which T-4 commits when
+the run ends. Corrected stale `CLAUDE.md` figures: `PACE` is 3.0 and `MAX_FETCHES`
+6,000 in the code (the docs still said 2.0 and 5,000 from before the pace probe), and
+the dataset facts table now reflects the 30 September scrape.
+
 **R25. Related artists; then the mobile crash report; then "make it 30 on desktop" plus
 the Buy Me a Coffee widget script.**
 

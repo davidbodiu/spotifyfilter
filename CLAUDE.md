@@ -74,7 +74,7 @@ Committed: the hand-written files in `public/`, the Python pipeline, `slugs.json
 
 ## Dataset facts
 
-Current `data.json.gz` was generated **31 July 2026**. `leads`/`features` are live, and
+Current `data.json.gz` was generated **30 September 2026** (local; CI refreshes weekly). `leads`/`features` are live, and
 B-1 is dead in the shipped artifact: "Tyler, The Creator" resolves to 195 songs with no
 "Tyler" or "The Creator" fragments.
 
@@ -99,10 +99,10 @@ row is (I-9).
 
 | Metric | Value |
 |---|---|
-| Songs | 321,878 |
-| Raw records before cleanup | 507,226 |
-| Compressed size | 19,650,671 bytes (75.0% of the 25 MiB cap) |
-| Uncompressed size | 111,475,229 bytes (`data.json`) |
+| Songs | 326,703 |
+| Raw records before cleanup | 511,148 |
+| Compressed size | 20,064,077 bytes (76.5% of the 25 MiB cap, which no longer binds it) |
+| Uncompressed size | 112,375,446 bytes (`data.json`) |
 | Minimum total streams | 1,000,000 |
 
 The artist index only ever contains the 3,000 artists the scraper visited. Artist names
@@ -192,14 +192,15 @@ pages carried a date. In CI that step is `continue-on-error`: a broken fetch mus
 block the stream refresh, since `cleanup.py` still reads last week's registry.
 
 **Rate limit, measured:** a burst at ~9/s drew 429s after ~190 requests and cleared
-in about a minute; 2/s sustained drew none over 300 requests. `PACE` (2.0/s) bounds the
+in about a minute; 2/s for 300 and 3/s for 400 requests drew none, and the 3/s local
+backfill ran 250k requests over 22 hours with zero 429s. `PACE` (3.0/s) bounds the
 rate across all workers and any 429 pauses every worker for `Retry-After` or 60 s.
 
 **Fetch order is popularity descending** (daily/total), so a run cut short by
-`MAX_FETCHES` (5,000 per CI run, ~42 min) still covers every plausible new release
+`MAX_FETCHES` (6,000 per CI run, ~33 min) still covers every plausible new release
 first. A song a few days old has a ratio no back-catalogue track can reach. The cold
-backfill of ~330k IDs runs locally with `RELEASE_DATES_MAX=400000` (about two days at
-2/s); CI's bounded runs continue whatever is left.
+backfill of ~330k IDs runs locally with `RELEASE_DATES_MAX=400000` (about 26 hours at
+3/s); CI's bounded runs continue whatever is left.
 
 **The registry is append-only and committed**, for the same reason as `slugs.json`: a
 date never changes, the backfill is ~330k requests, and CI runners keep nothing
@@ -435,8 +436,8 @@ full value is available on hover. Applied at 45 chars for title, 35 for artist.
 | `NEW_RELEASE_DAYS` | build_pages.py | 7 | Window for the new-releases surface (SD-24) |
 | `NEW_MAX_DECAY` | build_pages.py | 10 | Plausibility gate: total <= 10 x days x daily, else the date is an album re-date |
 | `NEW_EDITION_MARKERS` | build_pages.py | regex | Titles of new editions of old songs are excluded from the pool |
-| `PACE` | release_dates.py | 2.0 | Embed fetches per second; 9/s drew 429s |
-| `MAX_FETCHES` | release_dates.py | 5000 | Per-run budget; env `RELEASE_DATES_MAX` overrides |
+| `PACE` | release_dates.py | 3.0 | Embed fetches per second; 9/s drew 429s, 3/s never has |
+| `MAX_FETCHES` | release_dates.py | 6000 | Per-run budget; env `RELEASE_DATES_MAX` overrides |
 | `DEFAULT_ARTIST` | app.js | 'Billie Eilish' | Must match `PRELOAD` |
 | `SHOW_STREAM_SLIDERS` | app.js | false | **Dead flag, see below** |
 
@@ -535,7 +536,7 @@ python3 release_dates.py # appends new track IDs to release_dates.txt (commit it
 python3 cleanup.py       # writes data.json.gz (build intermediate, not deployed)
 ./deploy.sh              # builds the generated surface, gates on limits, publishes
 
-# One-off local backfill of the whole catalogue (~2 days at 2/s, resumable, safe to
+# One-off local backfill of the whole catalogue (~26 h at 3/s, resumable, safe to
 # interrupt; every 200 results are flushed to the registry)
 RELEASE_DATES_MAX=400000 python3 release_dates.py
 

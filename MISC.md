@@ -629,6 +629,8 @@ site and must stay disabled.
 
 ### T-4. Commit the finished release-date backfill before Monday's CI run `OPEN` `HIGH`
 
+**Status 2 October 09:46:** 250,402 of 285,270 fetched, ETA about 13:00 the same day.
+
 The full backfill (~324k IDs, ~31 hours at 3/s) was started locally on 30 September
 at 23:55 and appends to `release_dates.txt` every 200 results. The commit from R33
 holds an early snapshot of the registry. CI will append its own lines to the same

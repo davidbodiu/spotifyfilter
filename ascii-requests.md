@@ -742,3 +742,20 @@ Updated after every request. See the maintenance protocol in `CLAUDE.md`.
         |
   (( G-18 resolved ))
 ```
+
+## R37, 2 October: "Progress report?"
+
+```
+  (( status request, new session ))
+        |
+        [ pgrep ] --> backfill alive, PID 43554, started 1 Oct 10:31
+        [ log ] --> 250,402 / 285,270 at 3.0/s, ETA ~3 h
+        |     grep "429" -> 1 hit = "1429 min" in an ETA line, not a rate limit
+        [ registry ] --> 301,391 lines, 128 undated
+        [ git ] --> all commits pushed; only release_dates.txt modified (T-4)
+        |
+        !!! CLAUDE.md said PACE 2.0 / MAX_FETCHES 5,000; code is 3.0 / 6,000
+        [ fix docs ]
+        |
+  (( report ))
+```
