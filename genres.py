@@ -315,28 +315,42 @@ def classify_with_claude(todo, describe):
             print(f"  Budget reached at ${spent:.2f}; {len(todo) - i} artists left for next run.")
             break
         chunk = todo[i:i + CLAUDE_CHUNK]
-        resp = client.beta.messages.create(
-            model=CLAUDE_MODEL,
-            max_tokens=8000,
-            # Refusals are unlikely for artist names, but if one happens the API retries
-            # on Anthropic's recommended fallback model instead of returning nothing.
-            betas=["server-side-fallback-2026-07-01"],
-            fallbacks="default",
-            system=CLAUDE_SYSTEM,
-            output_config={"effort": "low",
-                           "format": {"type": "json_schema", "schema": claude_schema()}},
-            messages=[{"role": "user", "content": "\n".join(describe(a) for a in chunk)}],
-        )
+        try:
+            resp = client.beta.messages.create(
+                model=CLAUDE_MODEL,
+                max_tokens=8000,
+                # Refusals are unlikely for artist names, but if one happens the API
+                # retries on Anthropic's recommended fallback model instead of failing.
+                betas=["server-side-fallback-2026-07-01"],
+                fallbacks="default",
+                system=CLAUDE_SYSTEM,
+                output_config={"effort": "low",
+                               "format": {"type": "json_schema", "schema": claude_schema()}},
+                messages=[{"role": "user", "content": "\n".join(describe(a) for a in chunk)}],
+            )
+        except anthropic.APIError as e:
+            # Stop calling but keep what is done: the caller still writes the registry,
+            # so this week's Wikidata refresh is not lost to one failed request.
+            print(f"::warning::Claude request failed ({type(e).__name__}: {str(e)[:160]}); "
+                  f"{len(todo) - i} artists left for next run.")
+            break
         spent += (resp.usage.input_tokens * PRICE_IN
                   + resp.usage.output_tokens * PRICE_OUT) / 1e6
         if resp.stop_reason != "end_turn":
             print(f"  Request {i // CLAUDE_CHUNK + 1}: stop_reason {resp.stop_reason}; skipped.")
             continue
         text = next((b.text for b in resp.content if b.type == "text"), "")
-        wanted = {a["id"] for a in chunk}
-        for row in json.loads(text)["artists"]:
-            if row["id"] in wanted:
+        try:
+            rows = json.loads(text)["artists"]
+        except (ValueError, KeyError, TypeError) as e:
+            print(f"  Request {i // CLAUDE_CHUNK + 1}: unreadable reply ({e}); skipped.")
+            continue
+        names = {a["id"]: a["name"] for a in chunk}
+        for row in rows:
+            if row.get("id") in names and row.get("genre") in GENRES + ["Unknown"]:
                 results[row["id"]] = None if row["genre"] == "Unknown" else row["genre"]
+                if len(todo) <= 20:  # small weekly runs: log every answer for review
+                    print(f"    {names[row['id']]}: {row['genre']}")
         print(f"  {min(i + CLAUDE_CHUNK, len(todo))}/{len(todo)} classified, ${spent:.2f} so far")
     print(f"Claude: {len(results)} answered, {sum(1 for g in results.values() if g)} with a "
           f"genre; ${spent:.2f} spent.")
