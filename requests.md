@@ -991,6 +991,28 @@ Deployed as `5d4b6bb4`; verified live: `new.json` 7 days, 21 songs; `new30.json`
 days (31 August to 30 September), 39 shipped for the two top 30s; `/new/` and
 `/new-30/` return 200; `app.js` carries `NEW30_KEY`; both pages are in the sitemap.
 
+**R41. "I think the new column introduced a horizontal scroll bar on desktop, pls fix
+so that it's no longer there."**
+
+Confirmed by measurement: at a 1,280px window the table was 1,353px wide in a 1,225px
+container (128px over); at 1,440px and up it just fit. Cause: title and artist cells
+were `nowrap`, so each column was as wide as its longest truncated title, and fixed
+minimums (140px per stream column) left no slack once the Released column (R33)
+arrived. Fix, `styles.css` only: title and artist wrap between words (rows are already
+169px tall from the embed, so no height change, verified), stream headers may break
+onto two lines, minimums trimmed (title 140, artist 110, streams 80), and cell padding
+drops to 10px between 769 and 1,279px, which covered a 28px overflow at 1,024px from
+an unbreakable uppercase word. A first attempt used `overflow-wrap: anywhere` and
+split "Neighbourhood" mid-word; replaced with `break-word`. Verified: no overflow on 8
+views (Billie Eilish, global, both new-release pages, Taylor Swift, BTS, Bad Bunny,
+The Weeknd) at 1,024, 1,280 and 1,440px. Below 1,024 (tablets above the 768px
+breakpoint) the table still scrolls inside its wrapper, as before. Deployed as
+`e0095e88`; the live `styles.css` is byte-identical to the committed one.
+
+Side effect of testing, not a site defect: rendering ~450 embeds from this machine in
+two minutes drew Spotify "429 Too Many Requests" in the players for about a minute.
+Later checks suppressed the iframes (I-12).
+
 **R25. Related artists; then the mobile crash report; then "make it 30 on desktop" plus
 the Buy Me a Coffee widget script.**
 

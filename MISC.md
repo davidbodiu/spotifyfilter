@@ -513,6 +513,15 @@ young candidates bunch at 8 to 30 days old. Measured pool sizes: 7 days 21, 10 d
 "new" stretches to two Fridays); relax the decay gate (29, readmits pre-release singles
 R33 excluded); keep 7 days and show however many exist (21 this week, varies weekly).
 
+### I-12. Spotify's embed rate limit is per IP and shared with the release-date fetcher `INSIGHT`
+
+R41. Headless test renders loaded ~450 embeds in two minutes and every player showed
+"429 Too Many Requests" for about a minute. Two consequences: layout tests should strip
+iframe `src` (a MutationObserver in the probe page does it), and browsing the site
+from the same network while `release_dates.py` runs locally at 3/s eats into the same
+budget, so players may 429 during a backfill. Visitors elsewhere are unaffected; CI
+fetches from GitHub's IPs.
+
 ### I-11. Brazilian "Ao Vivo" titles pass the edition filter `INSIGHT`
 
 R40. `NEW_EDITION_MARKERS` matches English words only, so "Meu Silêncio - Ao Vivo" and

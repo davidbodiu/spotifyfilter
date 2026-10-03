@@ -824,3 +824,25 @@ Updated after every request. See the maintenance protocol in `CLAUDE.md`.
         |
   (( 30-day page live; G-19 resolved ))
 ```
+
+## R41, 3 October: horizontal scroll bar on desktop
+
+```
+  (( problem report ))
+        |
+        [ measure ] --> 1280px: table 1,353 in 1,225 (128 over); 1440+: fits
+        |     cause: nowrap title/artist + fixed minimums + Released column (R33)
+        |
+        [ wrap title/artist, trim minimums, wrap numeric headers ]
+        [ re-measure ] --> 1280 fits; 1024 still 155 over
+        [ tighter minimums ] --> fits, but screenshot shows "Neighbourho od"
+        |     !!! overflow-wrap: anywhere splits words  => break-word
+        |     !!! 429 in every player: ~450 test embeds from this IP (I-12)
+        |         => strip iframe src in probes
+        [ re-measure ] --> Billie Eilish 1024: 28 over (unbreakable uppercase word)
+        [ padding 10px for 769-1279 ]
+        [ 8 views x 1024/1280/1440 ] --> 0 overflow everywhere
+        [ deploy ] [ verify live ] [ commit + push ]
+        |
+  (( no desktop scroll bar ))
+```

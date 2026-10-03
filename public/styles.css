@@ -525,20 +525,22 @@ td:first-child {
 }
 
 .col-title {
-  min-width: 200px;
+  min-width: 140px;
 }
 
 .col-artist {
-  min-width: 160px;
+  min-width: 110px;
 }
 
+/* Two-word numeric headers may break onto two lines ("TOTAL / STREAMS") so the table
+   fits 1,024px windows (R41). */
 .col-streams {
-  min-width: 140px;
+  min-width: 80px;
   text-align: right;
+  white-space: normal;
 }
 
 .col-date {
-  min-width: 120px;
   text-align: right;
 }
 
@@ -551,6 +553,25 @@ td:first-child {
 .col-preview {
   min-width: 320px;
   text-align: center;
+}
+
+/* Title and artist wrap instead of forcing the table wider than its container (R41).
+   Rows are already ~170px tall from the embed, so a second line costs no height. The
+   Released column (R33) is what pushed the table past 1,280px windows. */
+td:nth-child(2),
+td:nth-child(3) {
+  white-space: normal;
+  overflow-wrap: break-word;
+}
+
+/* Narrow desktops: tighter cells so an unbreakable uppercase title word cannot push the
+   table past its container (R41). Measured: 28px overflow at 1,024px without this. */
+@media (min-width: 769px) and (max-width: 1279px) {
+  th,
+  td {
+    padding-left: 10px;
+    padding-right: 10px;
+  }
 }
 
 td:nth-child(4),

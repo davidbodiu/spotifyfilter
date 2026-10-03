@@ -410,6 +410,12 @@ gated; `#sort-select` has a `change` listener that calls `applyFilters()`.
 Renders the current page into two DOM trees, table rows and mobile cards, and lets CSS
 decide which is visible at the 768px breakpoint.
 
+**The table must fit its container from 1,024px up** (R41). Title and artist cells
+wrap between words (`overflow-wrap: break-word`, never `anywhere`, which splits words),
+stream headers may break onto two lines, and cell padding drops to 10px between 769
+and 1,279px. Adding a column means re-measuring at 1,024 and 1,280px; strip iframe
+`src` while testing or Spotify rate-limits the players (I-12).
+
 Each row gets a Spotify embed iframe, built by rewriting `open.spotify.com/track/` to
 `open.spotify.com/embed/track/` and appending `?utm_source=generator&theme=0` (dark).
 Iframes are `loading="lazy"`.
