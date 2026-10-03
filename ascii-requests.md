@@ -776,3 +776,28 @@ Updated after every request. See the maintenance protocol in `CLAUDE.md`.
         |
   (( report ))
 ```
+
+## R39, 3 October: "new releases in the last 7 days should see top 30"
+
+```
+  (( request: top 30 ))
+        |
+        !!! clash: SD-5 (R4.3) drops songs < 1M; only 12 qualify above it   *** flagged
+        |
+        [ sub-1M candidates, total <= 80 x daily ] --> 1,290; date them (7 min)
+        [ simulate ] --> 22 in window
+        |     candidate ages: <=7d 10 | 8-14d 80 | 15-30d 289   => kworb lag (I-10)
+        |     7d:22  10d:25  14d:211  7d+gate20:29
+        |
+        [ build the part every option needs ]
+        |     cleanup: date before threshold, set aside recent.json.gz (1,287)
+        |     build_pages: merge into new pool only; ship top-30 union total/daily
+        |     app.js: NEW_CAP 30 after sort; copy drops "million streams"
+        |
+        [ rebuild, mtime pinned (G-17) ] --> 21 songs; 99.96% of rows dated
+        [ deploy ] [ verify live ] [ commit + push ]
+        |
+        [ 21 -> 30: widen window / relax gate / accept ]   *** SD-12
+        |
+  (( awaiting choice, G-19 ))
+```

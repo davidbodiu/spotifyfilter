@@ -30,8 +30,9 @@ still covers every plausible new release first: a song a few days old has a rati
 back-catalogue track can reach. That makes the new-releases surface complete from the
 first run, while the long tail backfills over later runs.
 
-Input: data.json (raw scrape) when present, else data.json.gz. Only records at or above
-cleanup.py's MIN_TOTAL_STREAMS are fetched; the sub-1M tail never ships.
+Input: data.json (raw scrape) when present, else data.json.gz. Records at or above
+cleanup.py's MIN_TOTAL_STREAMS are fetched, plus sub-1M records young enough to be new
+releases (NEW_CANDIDATE_RATIO); the rest of the sub-1M tail never ships.
 
 Standalone. No CLI arguments. Environment overrides: RELEASE_DATES_MAX (fetch budget
 per run; CI keeps the weekly run bounded, a local backfill lifts it) and
@@ -54,6 +55,12 @@ RAW_INPUT = "data.json"
 CLEAN_INPUT = "data.json.gz"
 REGISTRY = "release_dates.txt"
 MIN_TOTAL_STREAMS = 1_000_000          # keep in step with cleanup.py
+# Below the floor, only plausible new releases are dated (R39): the new-releases page
+# draws on them to reach its top 30, while the rest of the site keeps the 1M floor
+# (SD-5). A song can only pass build_pages.py's decay gate if total/daily is at most
+# NEW_MAX_DECAY * (NEW_RELEASE_DAYS + 1) = 10 * 8, so nothing above that is fetched.
+# ~1,300 candidates in a weekly scrape, ~7 minutes at PACE.
+NEW_CANDIDATE_RATIO = 80
 EMBED_URL = "https://open.spotify.com/embed/track/{}"
 
 MAX_FETCHES = int(os.environ.get("RELEASE_DATES_MAX", "6000"))   # ~33 min at 3/s
@@ -162,7 +169,8 @@ def main():
 
     todo = {}
     for s in songs:
-        if s.get("totalStreams", 0) < MIN_TOTAL_STREAMS:
+        total, daily = s.get("totalStreams", 0), s.get("dailyStreams", 0)
+        if total < MIN_TOTAL_STREAMS and not (daily > 0 and total <= NEW_CANDIDATE_RATIO * daily):
             continue
         tid = track_id(s.get("url"))
         if not tid or tid in dates or tid in todo:

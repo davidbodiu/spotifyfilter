@@ -53,7 +53,8 @@ SORTS = ("totalStreams", "dailyStreams", "popularity")
 # Spotify attaches to the track, taken as the earliest across a merged cluster
 # (cleanup.py). Unknown dates simply do not qualify.
 NEW_RELEASE_DAYS = 7
-NEW_CAP = 1000          # the pool is tens to low hundreds; the cap is a safety rail
+NEW_CAP = 30            # top 30 per sort (R39); the app caps again after sorting
+RECENT = "recent.json.gz"  # sub-1M candidates from cleanup.py, this page only (R39)
 
 # Plausibility gate for the new-releases pool. Spotify's release date is the ALBUM
 # date of the track's canonical version, and when a single is folded into an album
@@ -241,13 +242,24 @@ def new_releases(songs, data_date):
             dropped.append(s)
         else:
             pool.append(s)
-    pool.sort(key=lambda s: -s["totalStreams"])
     dropped.sort(key=lambda s: -s["totalStreams"])
-    return since, pool[:NEW_CAP], dropped
+    # Ship the union of the top NEW_CAP by total and by daily, ordered by total. The
+    # app sorts by the chosen key and caps at NEW_CAP, so each sort shows its own
+    # top 30; popularity sorts within this union, which keeps the newest tiny songs
+    # (whose daily/total is near 1) from crowding out the hits.
+    by_total = sorted(pool, key=lambda s: -s["totalStreams"])[:NEW_CAP]
+    by_daily = sorted(pool, key=lambda s: -s["dailyStreams"])[:NEW_CAP]
+    seen, union = set(), []
+    for s in by_total + by_daily:
+        if s["url"] not in seen:
+            seen.add(s["url"])
+            union.append(s)
+    union.sort(key=lambda s: -s["totalStreams"])
+    return since, union, dropped, len(pool)
 
 
 def new_page_html(pool, since, data_date):
-    top = pool[:SONGS_ON_PAGE]
+    top = pool[:NEW_CAP]
     rows = "\n".join(
         f'      <tr><td>{i}</td><td>{esc(s["title"])}</td>'
         f'<td>{esc(s["artist"])}</td>'
@@ -301,8 +313,8 @@ def new_page_html(pool, since, data_date):
   <nav class="crumbs"><a href="/">Home</a> / New releases</nav>
 
   <h2 class="page-title">New releases: the most streamed songs of the last {NEW_RELEASE_DAYS} days</h2>
-  <p class="page-lede">{len(pool)} songs released between {since.isoformat()} and
-     {data_date.isoformat()} with at least a million streams.
+  <p class="page-lede">The top {len(top)} songs released between {since.isoformat()} and
+     {data_date.isoformat()}, by total streams.
      <a href="/?artist=new">Open in the interactive chart</a> to sort by daily plays
      and play previews.</p>
 
@@ -314,7 +326,6 @@ def new_page_html(pool, since, data_date):
       </tbody>
     </table>
   </div>
-  {"<p class='page-lede'>Showing the top %d of %d. <a href='/?artist=new'>See all</a>.</p>" % (SONGS_ON_PAGE, len(pool)) if len(pool) > SONGS_ON_PAGE else ""}
 </div>
 {BMC_WIDGET}
 </body>
@@ -389,10 +400,17 @@ def main():
     # New releases: a window over releaseDate ending at the data date, one file, the
     # client sorts. Ships the window so the app can say what "new" means.
     data_date = datetime.datetime.fromtimestamp(data_epoch, datetime.timezone.utc).date()
-    since, pool, dropped = new_releases(songs, data_date)
+    # Sub-1M candidates (R39) join the pool here and nowhere else: SD-5 still holds for
+    # artist pages, shards, the global chart and the index. Absent file = none.
+    recent = []
+    if os.path.exists(RECENT):
+        with gzip.open(RECENT, "rt", encoding="utf-8") as f:
+            recent = json.load(f)
+    since, pool, dropped, qualifying = new_releases(songs + recent, data_date)
     dated = sum(1 for s in songs if "releaseDate" in s)
-    print(f"Release dates on {dated:,} of {len(songs):,} songs; "
-          f"{len(pool):,} released since {since} (data date {data_date}), "
+    print(f"Release dates on {dated:,} of {len(songs):,} songs; {len(recent):,} sub-1M "
+          f"candidates. {qualifying:,} released since {since} qualify (data date "
+          f"{data_date}), shipping {len(pool):,} (top {NEW_CAP} by total and by daily); "
           f"{len(dropped):,} dropped (re-dated older songs, new editions of old songs).")
     for s in dropped[:5]:
         print(f"  dropped: {s['totalStreams']:,} total, {s['dailyStreams']:,} daily, "

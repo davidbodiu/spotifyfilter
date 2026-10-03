@@ -318,8 +318,14 @@ chart: a synthetic dropdown row, a deep link (`?artist=new`), one precomputed fi
 whose `releaseDate` falls within `NEW_RELEASE_DAYS = 7` of the data date, where the data
 date is the mtime of `data.json.gz`, i.e. the scrape date. The refresh runs Mondays and
 releases land on Fridays, so the window spans exactly one release day plus its weekend.
-The pool is tens of songs, because a song must reach 1M streams within days to be in
-the dataset at all.
+**Top 30, including sub-1M songs** (R39, SD-5 amended). `cleanup.py` sets aside dated
+sub-1M records with total <= 80 x daily (`NEW_CANDIDATE_RATIO`, the widest ratio the
+gate can pass in 8 days) into `recent.json.gz`; `build_pages.py` merges them into this
+pool and nowhere else. `new.json` ships the union of the top `NEW_CAP = 30` by total
+and by daily; `app.js` caps at 30 after sorting, like the global chart, so popularity
+sorts within that union rather than surfacing yesterday's 5,000-stream songs. On the
+30 September data 21 qualify, not 30: kworb lists new tracks about a week late (I-10),
+so the 7-day window under-counts. G-19 holds the options.
 
 **The plausibility gate is load-bearing** (`NEW_MAX_DECAY = 10`). Spotify's date is the
 album date of the track's canonical version, and when a single is folded into an album
@@ -441,6 +447,8 @@ full value is available on hover. Applied at 45 chars for title, 35 for artist.
 | `NEW_RELEASE_DAYS` | build_pages.py | 7 | Window for the new-releases surface (SD-24) |
 | `NEW_MAX_DECAY` | build_pages.py | 10 | Plausibility gate: total <= 10 x days x daily, else the date is an album re-date |
 | `NEW_EDITION_MARKERS` | build_pages.py | regex | Titles of new editions of old songs are excluded from the pool |
+| `NEW_CAP` | build_pages.py, app.js | 30 | Top 30 per sort on the new-releases page (R39) |
+| `NEW_CANDIDATE_RATIO` | release_dates.py, cleanup.py | 80 | Sub-1M songs with total <= 80 x daily are dated and kept for the new-releases page |
 | `PACE` | release_dates.py | 3.0 | Embed fetches per second; 9/s drew 429s, 3/s never has |
 | `MAX_FETCHES` | release_dates.py | 6000 | Per-run budget; env `RELEASE_DATES_MAX` overrides |
 | `DEFAULT_ARTIST` | app.js | 'Billie Eilish' | Must match `PRELOAD` |
@@ -554,7 +562,8 @@ cd public && python3 -m http.server 8000
 - `scrape.py`: kworb scraper
 - `release_dates.py`: Spotify embed page scraper, one fetch per new track ID
 - `release_dates.txt`: append-only track ID to release date registry (SD-24). Committed.
-- `cleanup.py`: dedup, encoding fix, popularity, release date, compression
+- `cleanup.py`: dedup, encoding fix, popularity, release date, compression; also writes
+  `recent.json.gz`, the sub-1M new-release candidates (not committed)
 - `build_pages.py`: generates artist pages, per-artist shards, the global chart, the
   new-releases file and page, the A-Z hub and the sitemap. Owns `slugs.json`.
 - `slugs.json`: append-only artist name to URL slug registry (SD-21). Committed.

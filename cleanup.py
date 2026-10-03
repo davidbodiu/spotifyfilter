@@ -14,9 +14,13 @@ import unicodedata
 
 INPUT_FILE = "data.json"
 OUTPUT_FILE = "data.json.gz"
+RECENT_FILE = "recent.json.gz"       # sub-1M plausible new releases, new-releases page only
 RELEASE_DATES = "release_dates.txt"  # append-only "<track id> <YYYY-MM-DD>" registry
 STREAM_TOLERANCE = 0.02  # 2% tolerance for matching stream counts
 MIN_TOTAL_STREAMS = 1_000_000  # exclude songs below this threshold
+# Sub-1M records young enough to be new releases (total <= 80 x daily) are kept aside
+# in RECENT_FILE for the new-releases page (R39). Keep in step with release_dates.py.
+NEW_CANDIDATE_RATIO = 80
 
 
 def fix_encoding(text):
@@ -223,7 +227,7 @@ def track_id(url):
 
 
 def cleanup(songs, release_dates=None):
-    """Run all cleanup steps on the song list."""
+    """Run all cleanup steps. Returns (songs to ship, sub-1M new-release candidates)."""
     release_dates = release_dates or {}
     # Step 1: Fix encoding, and guarantee every record has structured artist fields
     for song in songs:
@@ -306,25 +310,32 @@ def cleanup(songs, release_dates=None):
         else:
             song["popularity"] = 0
 
-    # Step 4: Filter by minimum stream threshold
-    deduped = [s for s in deduped if s["totalStreams"] >= MIN_TOTAL_STREAMS]
-
-    # Step 5: Release date, from the registry, keyed by track ID. For a merged cluster
+    # Step 4: Release date, from the registry, keyed by track ID. For a merged cluster
     # take the earliest date among its members. Omitted (not null) when unknown, so
-    # the artifact does not pay for the field on every undated row.
-    dated = 0
+    # the artifact does not pay for the field on every undated row. Runs before the
+    # threshold so the sub-1M new-release candidates get dates too.
     for song in deduped:
         urls = song.pop("_urls", None) or [song["url"]]
         found = [release_dates[t] for t in map(track_id, urls) if t in release_dates]
         if found:
             song["releaseDate"] = min(found)
-            dated += 1
+
+    # Step 5: Filter by minimum stream threshold (SD-5). The one exception is set
+    # aside, never merged back: dated sub-1M songs young enough to be new releases,
+    # which only the new-releases page reads (R39).
+    recent = [s for s in deduped
+              if s["totalStreams"] < MIN_TOTAL_STREAMS and "releaseDate" in s
+              and s["dailyStreams"] > 0
+              and s["totalStreams"] <= NEW_CANDIDATE_RATIO * s["dailyStreams"]]
+    deduped = [s for s in deduped if s["totalStreams"] >= MIN_TOTAL_STREAMS]
+    dated = sum(1 for s in deduped if "releaseDate" in s)
     print(f"Release dates: {dated:,} of {len(deduped):,} songs dated "
-          f"({dated / max(len(deduped), 1):.1%}); registry holds {len(release_dates):,}.")
+          f"({dated / max(len(deduped), 1):.1%}); registry holds {len(release_dates):,}. "
+          f"{len(recent):,} sub-1M new-release candidates set aside.")
 
     # Sort by total streams descending
     deduped.sort(key=lambda s: s["totalStreams"], reverse=True)
-    return deduped
+    return deduped, recent
 
 
 def main():
@@ -332,7 +343,7 @@ def main():
         songs = json.load(f)
     print(f"Loaded {len(songs)} songs.")
 
-    cleaned = cleanup(songs, load_release_dates())
+    cleaned, recent = cleanup(songs, load_release_dates())
 
     removed = len(songs) - len(cleaned)
     print(f"Removed {removed} duplicates. Final count: {len(cleaned)} songs.")
@@ -345,6 +356,10 @@ def main():
     with open(OUTPUT_FILE, "wb") as f:
         f.write(compressed)
     print(f"Written to {OUTPUT_FILE} ({len(compressed) / 1e6:.1f} MB gzipped)")
+
+    with open(RECENT_FILE, "wb") as f:
+        f.write(gzip.compress(json.dumps(recent).encode("utf-8"), compresslevel=9))
+    print(f"Written to {RECENT_FILE} ({len(recent):,} candidates)")
 
 
 if __name__ == "__main__":

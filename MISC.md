@@ -501,6 +501,22 @@ slowed, version, edit, remaster), which catches this and the Ben&Ben "Reimagined
 pair at the cost of hiding genuinely new remixes; or accept that Spotify's release
 date is per edition and say so on the page.
 
+### G-19. New releases cannot reach 30 inside 7 days `OPEN` `DECISION`
+
+R39. With sub-1M songs included, 21 qualify for 23 to 30 September. The source is the
+limit: kworb lists a new track on an artist page roughly a week after release, so the
+young candidates bunch at 8 to 30 days old. Measured pool sizes: 7 days 21, 10 days
+25, 14 days 211; gate 20 at 7 days 29. Options: widen to 14 days (always 30, but
+"new" stretches to two Fridays); relax the decay gate (29, readmits pre-release singles
+R33 excluded); keep 7 days and show however many exist (21 this week, varies weekly).
+
+### I-10. kworb lists new tracks about a week late `INSIGHT`
+
+R39. Of 1,290 sub-1M songs with total <= 80 x daily, release ages were: 10 within 7
+days, 80 at 8 to 14, 289 at 15 to 30, 526 at 31 to 365, 385 older. Friday releases
+appear on kworb artist pages in bulk the following week. Any new-releases surface fed
+by kworb under-counts its most recent days.
+
 ### B-20. Release-date backfill died on an uncaught `IncompleteRead` `FIXED`
 
 Found in R34: the local backfill log ended with `http.client.IncompleteRead` at 51k of

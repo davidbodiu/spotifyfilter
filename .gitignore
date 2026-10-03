@@ -19,6 +19,7 @@ public/sitemap.xml
 
 # Build intermediate. cleanup.py writes it, build_pages.py consumes it. Never deployed.
 data.json.gz
+recent.json.gz
 
 # Python
 __pycache__/

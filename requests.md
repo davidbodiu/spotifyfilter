@@ -22,7 +22,7 @@ silently.
 | SD-2 | Sliders are bucket-based, never continuous. | R1.3 | A linear 0 to 5B range is unusable. |
 | SD-3 | `PAGE_SIZE` is 10, and iframes must have `src` blanked before removal. | R5.2 | Spotify embeds stop playing without this. Both halves are the fix. |
 | SD-4 | Data ships gzipped; the browser decompresses with `DecompressionStream`. | R4.1, R4.2 | 97 MB raw is unshippable. Native API, no library, keeps SD-1. |
-| SD-5 | Songs under 1M total streams are excluded. | R4.3 | Long tail is noise. |
+| SD-5 | Songs under 1M total streams are excluded. **Amended R39:** except dated sub-1M songs young enough to be new releases, which feed the new-releases page only (`recent.json.gz`), never shards, artist pages, the index or the global chart. | R4.3, R39 | Long tail is noise; a week-old song rarely has 1M streams yet. |
 | SD-6 | The app is artist-first. No global song search. | R6.1 | The 31 March pivot. This is the product. |
 | SD-7 | Featured artists are indexed under their own name. | R6.3 | Searching a feature should find the track. |
 | SD-8 | Stream range sliders are hidden but their code stays in the tree. | R7.2 | Removal was explicitly scoped to the UI, not the logic. |
@@ -41,7 +41,7 @@ silently.
 | SD-21 | `slugs.json` is append-only. A name's slug is never reassigned. | R19 | A changed slug destroys its own URL, backlinks and rankings. |
 | SD-22 | Spotify embeds are left exactly as they are, dark in both themes. | R19 | Verified: no light embed exists. User chose to leave it. |
 | SD-23 | The global **popularity** chart only ranks songs with >= 400k daily streams (`POP_MIN_DAILY`). Other sorts and per-artist views are unfiltered. | R31 | popularity = daily/total explodes near the 1M total floor; user chose a daily floor over a total floor or damped ratio. |
-| SD-24 | Release dates come from the Spotify **embed page**, one fetch per track ID, into `release_dates.txt`, which is append-only and committed. The new-releases surface is a 7-day window (`NEW_RELEASE_DAYS`) behind a plausibility gate (`NEW_MAX_DECAY`, since Spotify re-dates singles to their album) and an edition-marker exclusion (`NEW_EDITION_MARKERS`, R36), and obeys the app-wide sort. | R33, R36 | The Web API now needs Premium, lost batch `GET /tracks` and is retiring Client Credentials for metadata; the embed page needs nothing. User delegated the choice to research (R33) after the options were laid out in R32. |
+| SD-24 | Release dates come from the Spotify **embed page**, one fetch per track ID, into `release_dates.txt`, which is append-only and committed. The new-releases surface is a 7-day window (`NEW_RELEASE_DAYS`) behind a plausibility gate (`NEW_MAX_DECAY`, since Spotify re-dates singles to their album) and an edition-marker exclusion (`NEW_EDITION_MARKERS`, R36), shows the top 30 per sort including sub-1M songs (R39), and obeys the app-wide sort. | R33, R36, R39 | The Web API now needs Premium, lost batch `GET /tracks` and is retiring Client Credentials for metadata; the embed page needs nothing. User delegated the choice to research (R33) after the options were laid out in R32. |
 
 ---
 
@@ -930,6 +930,36 @@ retried next run. Committed and pushed `release_dates.txt`, closing T-4 two days
 the Monday CI run. Not rebuilt or redeployed: Monday's run rebuilds from the committed
 registry and fills the Released column site-wide, and a local rebuild today would move
 the new-releases window (G-17) unless the data file's mtime were pinned.
+
+**R39. "For new releases in the last 7 days should see top 30 please."**
+
+**Clash flagged before acting: SD-5 (R4.3) excludes songs under 1M streams.** The page
+showed 12 because only 12 qualifying songs released in the window had passed 1M.
+Reaching 30 inside 7 days needs sub-1M songs, so SD-5 is amended for this page only;
+the alternatives (wider window, looser filters) contradict the request or R33/R36.
+
+Built: `release_dates.py` also dates sub-1M records with total <= 80 x daily (the
+widest ratio the decay gate can pass in an 8-day window): 1,291 fetched in 7 minutes.
+`cleanup.py` dates records before the threshold and writes those candidates to
+`recent.json.gz` (1,287, 83 KB); `build_pages.py` merges them into the new-releases
+pool only and ships the union of the top 30 by total and by daily; `app.js` caps at
+`NEW_CAP = 30` after sorting, like the global chart. Copy no longer says "at least a
+million streams".
+
+**Result: 21 songs, not 30.** 11 above 1M, 10 below. Measured why: of the 1,290 young
+sub-1M candidates only 10 were released in the window; 80 were 8 to 14 days old and
+289 were 15 to 30. kworb adds new tracks to artist pages with a lag of about a week,
+so a 7-day window sees only the fastest-listed songs. Pool sizes on the same data:
+7 days 22 (simulated, 21 built), 10 days 25, 14 days 211; 7 days with the decay gate
+at 20 instead of 10: 29, by readmitting pre-release singles R33 excluded on purpose.
+Options for the gap presented per SD-12; awaiting the user's choice (MISC G-19).
+
+Also, since the registry backfill is complete, this rebuild dates 99.96% of rows, so
+the deploy filled the Released column site-wide two days before Monday's CI run.
+`data.json.gz` rose to 21.7 MB (82.7% of the vestigial cap). Deployed as `c3d6ffe1`;
+verified live: `new.json` 21 songs (10 below 1M), Billie Eilish shard 78 of 78 dated
+with no sub-1M rows leaking in, `app.js` carries `NEW_CAP`, data vintage unchanged. Built with the data
+file's mtime pinned to the 30 September vintage so the window did not move (G-17).
 
 **R25. Related artists; then the mobile crash report; then "make it 30 on desktop" plus
 the Buy Me a Coffee widget script.**

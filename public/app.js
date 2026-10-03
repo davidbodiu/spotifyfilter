@@ -36,6 +36,9 @@ const GLOBAL_CAP = 1000;
 // itself so the results line can say what "new" means for this data vintage.
 const NEW_KEY = '__new__';
 const NEW_LABEL = 'New releases (last 7 days)';
+// Top 30 per sort (R39). new.json ships the union of the top 30 by total and by daily,
+// so the cap must come AFTER sorting, exactly like GLOBAL_CAP.
+const NEW_CAP = 30;
 let newWindow = null;   // { since, until, days } once data/new.json has loaded
 
 // Deep-link slugs for the two non-artist surfaces.
@@ -51,7 +54,7 @@ const RELATED_CAP = 12;
 const SHOW_STREAM_SLIDERS = false;
 
 // Billie Eilish preload for instant display (sorted by total streams)
-const PRELOAD = [{"title":"BIRDS OF A FEATHER","artist":"Billie Eilish","totalStreams":4010444217,"dailyStreams":2090876,"url":"https://open.spotify.com/track/6dOtVTDdiauQNBQEDOtlAB","popularity":521.4},{"title":"lovely (with Khalid)","artist":"Billie Eilish (feat. Khalid)","totalStreams":3891726352,"dailyStreams":993958,"url":"https://open.spotify.com/track/0u2P5u6lvoDfwTYjAADbn4","popularity":255.4},{"title":"bad guy","artist":"Billie Eilish, Justin Bieber","totalStreams":2982902681,"dailyStreams":442011,"url":"https://open.spotify.com/track/2Fxmhks0bxGSBdJ92vM42m","popularity":148.2},{"title":"when the party's over","artist":"Billie Eilish","totalStreams":2568409072,"dailyStreams":573073,"url":"https://open.spotify.com/track/43zdsphuZLzwA9k4DJhU0I","popularity":223.1},{"title":"ocean eyes","artist":"Billie Eilish","totalStreams":2321035171,"dailyStreams":945362,"url":"https://open.spotify.com/track/2uIX8YMNjGMD7441kqyyNU","popularity":407.3},{"title":"WILDFLOWER","artist":"Billie Eilish","totalStreams":2281940946,"dailyStreams":1729499,"url":"https://open.spotify.com/track/3QaPy1KgI7nu9FJEQUgn6h","popularity":757.9},{"title":"everything i wanted","artist":"Billie Eilish","totalStreams":2177693842,"dailyStreams":457685,"url":"https://open.spotify.com/track/3ZCTVFBt2Brf31RLEnCkWJ","popularity":210.2},{"title":"Happier Than Ever","artist":"Billie Eilish","totalStreams":1929867678,"dailyStreams":596945,"url":"https://open.spotify.com/track/4RVwu0g32PAqgUiJoXsdF8","popularity":309.3},{"title":"What Was I Made For? [From The Motion Picture \"Barbie\"]","artist":"Billie Eilish","totalStreams":1686005312,"dailyStreams":609125,"url":"https://open.spotify.com/track/6wf7Yu7cxBSPrRlWeSeK0Q","popularity":361.3},{"title":"i love you","artist":"Billie Eilish","totalStreams":1416820105,"dailyStreams":437876,"url":"https://open.spotify.com/track/6CcJMwBtXByIz4zQLzFkKc","popularity":309.1}];
+const PRELOAD = [{"title":"BIRDS OF A FEATHER","artist":"Billie Eilish","totalStreams":4010444217,"dailyStreams":2090876,"url":"https://open.spotify.com/track/6dOtVTDdiauQNBQEDOtlAB","popularity":521.4,"releaseDate":"2024-05-17"},{"title":"lovely (with Khalid)","artist":"Billie Eilish (feat. Khalid)","totalStreams":3891726352,"dailyStreams":993958,"url":"https://open.spotify.com/track/0u2P5u6lvoDfwTYjAADbn4","popularity":255.4,"releaseDate":"2018-04-19"},{"title":"bad guy","artist":"Billie Eilish, Justin Bieber","totalStreams":2982902681,"dailyStreams":442011,"url":"https://open.spotify.com/track/2Fxmhks0bxGSBdJ92vM42m","popularity":148.2,"releaseDate":"2019-03-29"},{"title":"when the party's over","artist":"Billie Eilish","totalStreams":2568409072,"dailyStreams":573073,"url":"https://open.spotify.com/track/43zdsphuZLzwA9k4DJhU0I","popularity":223.1,"releaseDate":"2019-03-29"},{"title":"ocean eyes","artist":"Billie Eilish","totalStreams":2321035171,"dailyStreams":945362,"url":"https://open.spotify.com/track/2uIX8YMNjGMD7441kqyyNU","popularity":407.3,"releaseDate":"2016-11-18"},{"title":"WILDFLOWER","artist":"Billie Eilish","totalStreams":2281940946,"dailyStreams":1729499,"url":"https://open.spotify.com/track/3QaPy1KgI7nu9FJEQUgn6h","popularity":757.9,"releaseDate":"2024-05-17"},{"title":"everything i wanted","artist":"Billie Eilish","totalStreams":2177693842,"dailyStreams":457685,"url":"https://open.spotify.com/track/3ZCTVFBt2Brf31RLEnCkWJ","popularity":210.2,"releaseDate":"2019-11-13"},{"title":"Happier Than Ever","artist":"Billie Eilish","totalStreams":1929867678,"dailyStreams":596945,"url":"https://open.spotify.com/track/4RVwu0g32PAqgUiJoXsdF8","popularity":309.3,"releaseDate":"2021-07-30"},{"title":"What Was I Made For? [From The Motion Picture \"Barbie\"]","artist":"Billie Eilish","totalStreams":1686005312,"dailyStreams":609125,"url":"https://open.spotify.com/track/6wf7Yu7cxBSPrRlWeSeK0Q","popularity":361.3,"releaseDate":"2023-07-13"},{"title":"i love you","artist":"Billie Eilish","totalStreams":1416820105,"dailyStreams":437876,"url":"https://open.spotify.com/track/6CcJMwBtXByIz4zQLzFkKc","popularity":309.1,"releaseDate":"2019-03-29"}];
 
 // State
 let artistIndex = {};  // { "artist name lowercase": { name: "Display Name", count: N } }
@@ -258,6 +261,7 @@ async function applyFilters() {
   // Cap after sorting: the top 1,000 by total streams is a different set from the
   // top 1,000 by popularity.
   if (isGlobal() && filtered.length > GLOBAL_CAP) filtered = filtered.slice(0, GLOBAL_CAP);
+  if (isNew() && filtered.length > NEW_CAP) filtered = filtered.slice(0, NEW_CAP);
 
   currentPage = 1;
   render();
@@ -314,7 +318,7 @@ function render() {
   if (totalResults === 0) {
     resultsCount.textContent = '';
     noResults.textContent = isNew()
-      ? `No song released in the last ${newWindow ? newWindow.days : 7} days has reached a million streams yet.`
+      ? `No new releases from the last ${newWindow ? newWindow.days : 7} days are listed yet.`
       : 'No songs found for this artist';
     noResults.style.display = 'block';
     tableWrapper.style.display = 'none';
@@ -325,7 +329,7 @@ function render() {
       resultsCount.textContent = `Global chart: showing ${start + 1}\u2013${end} of the top ${totalResults.toLocaleString()} songs by ${sortLabel()}`;
     } else if (isNew()) {
       const window_ = newWindow ? ` released ${formatDate(newWindow.since)} to ${formatDate(newWindow.until)}` : '';
-      resultsCount.textContent = `New releases: showing ${start + 1}\u2013${end} of ${totalResults.toLocaleString()} songs${window_}, by ${sortLabel()}`;
+      resultsCount.textContent = `New releases: the top ${totalResults.toLocaleString()} songs${window_}, by ${sortLabel()}`;
     } else {
       resultsCount.textContent = `${selectedLabel}: showing ${start + 1}\u2013${end} of ${totalResults.toLocaleString()} songs`;
     }

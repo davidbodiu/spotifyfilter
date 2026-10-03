@@ -75,7 +75,8 @@ spotify_filter/
 |   +-- release_dates.txt .... append-only track id -> date registry (SD-24). COMMITTED.
 |   +-- snapshots/ ........... dated archives. Local disk only, not committed.
 |   +-- data.json ............ scraper output, ~106 MB. Intermediate.
-|   +-- data.json.gz ......... cleaned, ~19.6 MB. Intermediate, feeds build_pages.
+|   +-- data.json.gz ......... cleaned, ~21.7 MB. Intermediate, feeds build_pages.
+|   +-- recent.json.gz ....... sub-1M new-release candidates, ~80 KB. Intermediate.
 |
 +-- DOCS (all five updated after every request)
     +-- CLAUDE.md ............ app and architecture summary
@@ -128,6 +129,7 @@ release_dates.txt ............... append-only, committed (SD-24)
    |    popularity = daily/total * 1e6
    |    drop < MIN_TOTAL_STREAMS (1,000,000)
    |    releaseDate = min(registry[id] for id in cluster _urls), omitted if none
+   |    sub-1M with total <= 80 x daily and a date -> recent.json.gz (R39)
    v
 data.json.gz .................... 321,878 songs, 19.6 MB, gitignored
    |                              discards 36.5%: 175,256 sub-1M + 10,092 merged
@@ -138,8 +140,10 @@ data.json.gz .................... 321,878 songs, 19.6 MB, gitignored
    |    co-occurrence map .............. 12 collaborator links per page
    |    page_html() .................... 50 songs as text + MusicGroup/
    |                                     BreadcrumbList/ItemList JSON-LD
-   |    new_releases() ................. releaseDate >= data date - NEW_RELEASE_DAYS,
-   |                                     decay gate, NEW_EDITION_MARKERS
+   |    new_releases() ................. songs + recent.json.gz;
+   |                                     releaseDate >= data date - NEW_RELEASE_DAYS,
+   |                                     decay gate, NEW_EDITION_MARKERS,
+   |                                     ship top-30 union by total and by daily
    |    new_page_html() ................ /new/ with datePublished JSON-LD
    v
 public/{artist,artists,new,data,sitemap.xml}
