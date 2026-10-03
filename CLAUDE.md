@@ -202,6 +202,11 @@ first. A song a few days old has a ratio no back-catalogue track can reach. The 
 backfill of ~330k IDs runs locally with `RELEASE_DATES_MAX=400000` (about 26 hours at
 3/s); CI's bounded runs continue whatever is left.
 
+**Backfill complete** (2 October 2026, R38): 336,259 IDs, 156 undated, 11.4 MB. Covers
+99.95% of the 30 September scrape's IDs at or above 1M streams; the 2 missing were
+transient failures, which are not recorded and so are retried by the next run. From
+here the weekly CI step only fetches new IDs (~1,650, about 10 minutes).
+
 **The registry is append-only and committed**, for the same reason as `slugs.json`: a
 date never changes, the backfill is ~330k requests, and CI runners keep nothing
 between runs. Plain text rather than gzip so git stores each week's commit as a small

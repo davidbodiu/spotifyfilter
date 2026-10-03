@@ -759,3 +759,20 @@ Updated after every request. See the maintenance protocol in `CLAUDE.md`.
         |
   (( report ))
 ```
+
+## R38, 3 October: "progress report?"
+
+```
+  (( status request ))
+        |
+        [ pgrep ] --> not running
+        [ log ] --> "Fetched 285,270: 285,132 dated, 138 without a date, 95391s"
+        [ registry ] --> 336,259 lines, 0 duplicate IDs, 0 malformed
+        [ coverage vs 30 Sep scrape ] --> 99.95% dated, 2 missing (transient, retried)
+        |
+        [ commit + push release_dates.txt ]  --> T-4 closed before Monday's CI
+        |
+        [ redeploy now? ] --> no: CI rebuilds Monday; local rebuild shifts window (G-17)
+        |
+  (( report ))
+```

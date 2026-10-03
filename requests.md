@@ -920,6 +920,17 @@ the run ends. Corrected stale `CLAUDE.md` figures: `PACE` is 3.0 and `MAX_FETCHE
 6,000 in the code (the docs still said 2.0 and 5,000 from before the pace probe), and
 the dataset facts table now reflects the 30 September scrape.
 
+**R38. "progress report?"** (3 October)
+
+The local backfill had finished on 2 October at 13:01: 285,270 IDs in 26.5 hours,
+285,132 dated, 138 undated, zero 429s, no crash after the B-20 fix. Registry verified
+(336,259 lines, no duplicates, no malformed lines) and measured at 99.95% coverage of
+the 30 September scrape's IDs at or above 1M; the 2 missing were transient failures,
+retried next run. Committed and pushed `release_dates.txt`, closing T-4 two days before
+the Monday CI run. Not rebuilt or redeployed: Monday's run rebuilds from the committed
+registry and fills the Released column site-wide, and a local rebuild today would move
+the new-releases window (G-17) unless the data file's mtime were pinned.
+
 **R25. Related artists; then the mobile crash report; then "make it 30 on desktop" plus
 the Buy Me a Coffee widget script.**
 

@@ -627,7 +627,11 @@ site and must stay disabled.
 
 ## Todos
 
-### T-4. Commit the finished release-date backfill before Monday's CI run `OPEN` `HIGH`
+### T-4. Commit the finished release-date backfill before Monday's CI run `DONE` (R38)
+
+**Done 3 October.** The run ended 2 October 13:01: 285,270 fetched in 95,391 s, 285,132
+dated, 138 undated, zero 429s. Registry 336,259 lines, no duplicate IDs, no malformed
+lines. Committed and pushed before the 5 October CI run, so no append conflict.
 
 **Status 2 October 09:46:** 250,402 of 285,270 fetched, ETA about 13:00 the same day.
 
