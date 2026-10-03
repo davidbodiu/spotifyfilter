@@ -846,3 +846,27 @@ Updated after every request. See the maintenance protocol in `CLAUDE.md`.
         |
   (( no desktop scroll bar ))
 ```
+
+## R42, 3 October: "can we assign genre to each track? options?"
+
+```
+  (( question ))
+        |
+        [ prior decisions on genre? ] --> none, no clash
+        [ kworb artist list ] --> 3,000 names + Spotify artist IDs (exact join key)
+        |
+        [ Spotify ] --> API keeps artist genres, but Premium-gated, per-artist (R33)
+        |              embed/web pages: no genre
+        [ Wikidata, all 3,000 ] --> 74% with genre; 95% of global top 1,000; CC0
+        [ MusicBrainz, 60 ] --> 82% with genre;  !!! genres CC BY-NC-SA
+        [ Apple, 20 + 24 tracks ] --> 20/20; track level catches crossovers
+        |                             !!! terms: promote store content only
+        [ Deezer, 24 tracks ] --> first probe 0/24 = my query syntax; plain 24/24
+        |                         !!! terms: non-commercial incl. donations
+        [ Last.fm ] --> terms non-commercial; not probed (needs key)
+        [ Claude ] --> not run; ~$1.50-$11 once, cents weekly (estimate)
+        |
+        [ options: Wikidata / Apple / Claude / Wikidata + Claude ]   *** SD-12
+        |
+  (( awaiting choice, R-9 ))
+```

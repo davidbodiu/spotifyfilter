@@ -567,6 +567,22 @@ re-measure before moving it. The gate also means a re-dated song stays out even 
 the backfill dates its original URL, so `cleanup.py`'s earliest-across-cluster rule is
 a second line, not the first.
 
+### R-9. Genre for every song `OPEN` `DECISION`
+
+R42. Sources measured on the real artist list: Wikidata 74% of artists (95% of the
+global top 1,000), CC0, exact join on Spotify artist ID; Apple iTunes Search 20/20 on a
+sample including the tail, coarse labels, track level available, terms limited to
+promoting Apple's store, ~20 calls a minute; Claude classification, full coverage by
+construction, ~$1.50 to $11 once and cents weekly, unmeasured accuracy on obscure
+artists. Ruled out on terms: MusicBrainz genres (non-commercial), Deezer
+(non-commercial including indirect revenue), Last.fm (non-commercial). Ruled out on
+access: Spotify Web API (Premium-gated, per-artist calls, R33).
+
+Decisions that follow the source: artist-level (a track inherits its first lead's
+genre) or track-level (crossovers such as "TEXAS HOLD 'EM" read Country); one primary
+genre or several; and a fixed list of about 15 buckets for any UI filter, which the
+fine-grained sources need a mapping table to reach.
+
 ### R-8. New-releases ranking could normalise for days on sale `OPEN` `LOW`
 
 The surface ranks by the app-wide sort (total by default). Within a 7-day window the

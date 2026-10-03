@@ -164,6 +164,10 @@ understated it.)
   already appear as leads, and joins them into the `artist` string.
 - Stream counts are taken as `max()` across entries for the same URL, since kworb pages
   can disagree slightly.
+- kworb's artist links carry each artist's **Spotify artist ID**
+  (`/spotify/artist/<id>_songs.html`). The scraper keeps only the URL today. Wikidata
+  (property P1902) and MusicBrainz key artists by that ID, which allows exact joins
+  for artist metadata such as genre instead of name matching (R42).
 
 **Resumability:** writes `scrape_progress.json` every 10 artists and deletes it on
 success. Re-running after an interruption skips completed artists by name.

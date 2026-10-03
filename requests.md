@@ -1013,6 +1013,40 @@ Side effect of testing, not a site defect: rendering ~450 embeds from this machi
 two minutes drew Spotify "429 Too Many Requests" in the players for about a minute.
 Later checks suppressed the iframes (I-12).
 
+**R42. "I guess the next thing is if we can somehow assign genre to each track? What are
+our options?"**
+
+Question; no code changed. Nothing in the log touches genre, so no clash. Measured
+rather than recalled, on the real 3,000-artist list (1 October to 3 October 2026):
+
+- **kworb's artist links carry the Spotify artist ID** (`/spotify/artist/<id>_songs.html`),
+  so artist-level sources that store Spotify IDs can be joined exactly, not by name.
+- **Wikidata** (P1902 Spotify artist ID, P136 genre), all 3,000 by SPARQL in seconds:
+  83% matched, 74% with a genre (top 500: 93%, ranks 1,500 to 3,000: 65%); weighted, 83%
+  of all streams, 95.3% of the global top 1,000, 69% of the 30-day new releases. 621
+  distinct fine-grained labels, median 3 per artist. CC0.
+- **MusicBrainz**, 60-artist sample via Spotify URL relations: 95% matched, 82% with a
+  genre. Genres are supplementary data under CC BY-NC-SA (non-commercial).
+- **Apple iTunes Search**, 20-artist sample: 20/20 exact name matches, all with a
+  coarse `primaryGenreName`, including tail artists Wikidata lacks. Track level caught
+  crossovers: "Love Story", "TEXAS HOLD 'EM", "I Had Some Help" all Country. About 20
+  calls a minute; terms allow promotional use of store content only.
+- **Deezer**, same tracks by plain search: 24/24 with the right artist, album genres,
+  crossovers caught too. Terms: strictly non-commercial, explicitly including indirect
+  revenue, which the donation widget is.
+- **Last.fm**: not probed (needs a key); terms non-commercial, attribution, 100 MB cap.
+- **Spotify**: the Web API still returns artist `genres` (the February 2026 guide
+  removed `followers` and `popularity`, not `genres`), but only via per-artist calls
+  under Premium-gated Development Mode, ruled out in R33. Embed and web pages carry no
+  genre.
+- **Claude classification**: not run (spends money). Estimated with `claude-opus-5-5`
+  at $4/$20 per million tokens and the 50% Batches discount: about $1.50 to $11 for
+  3,000 artists depending on packing, cents per week for the 2 to 15 new artists the
+  weekly scrape adds (measured from slug registry commits).
+
+Options presented per SD-12 (Wikidata; Apple; Claude; Wikidata plus Claude for gaps),
+recommendation held; awaiting the user's choice (MISC R-9).
+
 **R25. Related artists; then the mobile crash report; then "make it 30 on desktop" plus
 the Buy Me a Coffee widget script.**
 
