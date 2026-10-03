@@ -63,7 +63,7 @@ const RELATED_CAP = 12;
 const SHOW_STREAM_SLIDERS = false;
 
 // Billie Eilish preload for instant display (sorted by total streams)
-const PRELOAD = [{"title":"BIRDS OF A FEATHER","artist":"Billie Eilish","totalStreams":4010444217,"dailyStreams":2090876,"url":"https://open.spotify.com/track/6dOtVTDdiauQNBQEDOtlAB","popularity":521.4,"releaseDate":"2024-05-17"},{"title":"lovely (with Khalid)","artist":"Billie Eilish (feat. Khalid)","totalStreams":3891726352,"dailyStreams":993958,"url":"https://open.spotify.com/track/0u2P5u6lvoDfwTYjAADbn4","popularity":255.4,"releaseDate":"2018-04-19"},{"title":"bad guy","artist":"Billie Eilish, Justin Bieber","totalStreams":2982902681,"dailyStreams":442011,"url":"https://open.spotify.com/track/2Fxmhks0bxGSBdJ92vM42m","popularity":148.2,"releaseDate":"2019-03-29"},{"title":"when the party's over","artist":"Billie Eilish","totalStreams":2568409072,"dailyStreams":573073,"url":"https://open.spotify.com/track/43zdsphuZLzwA9k4DJhU0I","popularity":223.1,"releaseDate":"2019-03-29"},{"title":"ocean eyes","artist":"Billie Eilish","totalStreams":2321035171,"dailyStreams":945362,"url":"https://open.spotify.com/track/2uIX8YMNjGMD7441kqyyNU","popularity":407.3,"releaseDate":"2016-11-18"},{"title":"WILDFLOWER","artist":"Billie Eilish","totalStreams":2281940946,"dailyStreams":1729499,"url":"https://open.spotify.com/track/3QaPy1KgI7nu9FJEQUgn6h","popularity":757.9,"releaseDate":"2024-05-17"},{"title":"everything i wanted","artist":"Billie Eilish","totalStreams":2177693842,"dailyStreams":457685,"url":"https://open.spotify.com/track/3ZCTVFBt2Brf31RLEnCkWJ","popularity":210.2,"releaseDate":"2019-11-13"},{"title":"Happier Than Ever","artist":"Billie Eilish","totalStreams":1929867678,"dailyStreams":596945,"url":"https://open.spotify.com/track/4RVwu0g32PAqgUiJoXsdF8","popularity":309.3,"releaseDate":"2021-07-30"},{"title":"What Was I Made For? [From The Motion Picture \"Barbie\"]","artist":"Billie Eilish","totalStreams":1686005312,"dailyStreams":609125,"url":"https://open.spotify.com/track/6wf7Yu7cxBSPrRlWeSeK0Q","popularity":361.3,"releaseDate":"2023-07-13"},{"title":"i love you","artist":"Billie Eilish","totalStreams":1416820105,"dailyStreams":437876,"url":"https://open.spotify.com/track/6CcJMwBtXByIz4zQLzFkKc","popularity":309.1,"releaseDate":"2019-03-29"}];
+const PRELOAD = [{"title":"BIRDS OF A FEATHER","artist":"Billie Eilish","totalStreams":4010444217,"dailyStreams":2090876,"url":"https://open.spotify.com/track/6dOtVTDdiauQNBQEDOtlAB","popularity":521.4,"releaseDate":"2024-05-17","genre":"Alternative & Indie"},{"title":"lovely (with Khalid)","artist":"Billie Eilish (feat. Khalid)","totalStreams":3891726352,"dailyStreams":993958,"url":"https://open.spotify.com/track/0u2P5u6lvoDfwTYjAADbn4","popularity":255.4,"releaseDate":"2018-04-19","genre":"Alternative & Indie"},{"title":"bad guy","artist":"Billie Eilish, Justin Bieber","totalStreams":2982902681,"dailyStreams":442011,"url":"https://open.spotify.com/track/2Fxmhks0bxGSBdJ92vM42m","popularity":148.2,"releaseDate":"2019-03-29","genre":"Alternative & Indie"},{"title":"when the party's over","artist":"Billie Eilish","totalStreams":2568409072,"dailyStreams":573073,"url":"https://open.spotify.com/track/43zdsphuZLzwA9k4DJhU0I","popularity":223.1,"releaseDate":"2019-03-29","genre":"Alternative & Indie"},{"title":"ocean eyes","artist":"Billie Eilish","totalStreams":2321035171,"dailyStreams":945362,"url":"https://open.spotify.com/track/2uIX8YMNjGMD7441kqyyNU","popularity":407.3,"releaseDate":"2016-11-18","genre":"Alternative & Indie"},{"title":"WILDFLOWER","artist":"Billie Eilish","totalStreams":2281940946,"dailyStreams":1729499,"url":"https://open.spotify.com/track/3QaPy1KgI7nu9FJEQUgn6h","popularity":757.9,"releaseDate":"2024-05-17","genre":"Alternative & Indie"},{"title":"everything i wanted","artist":"Billie Eilish","totalStreams":2177693842,"dailyStreams":457685,"url":"https://open.spotify.com/track/3ZCTVFBt2Brf31RLEnCkWJ","popularity":210.2,"releaseDate":"2019-11-13","genre":"Alternative & Indie"},{"title":"Happier Than Ever","artist":"Billie Eilish","totalStreams":1929867678,"dailyStreams":596945,"url":"https://open.spotify.com/track/4RVwu0g32PAqgUiJoXsdF8","popularity":309.3,"releaseDate":"2021-07-30","genre":"Alternative & Indie"},{"title":"What Was I Made For? [From The Motion Picture \"Barbie\"]","artist":"Billie Eilish","totalStreams":1686005312,"dailyStreams":609125,"url":"https://open.spotify.com/track/6wf7Yu7cxBSPrRlWeSeK0Q","popularity":361.3,"releaseDate":"2023-07-13","genre":"Alternative & Indie"},{"title":"i love you","artist":"Billie Eilish","totalStreams":1416820105,"dailyStreams":437876,"url":"https://open.spotify.com/track/6CcJMwBtXByIz4zQLzFkKc","popularity":309.1,"releaseDate":"2019-03-29","genre":"Alternative & Indie"}];
 
 // State
 let artistIndex = {};  // { "artist name lowercase": { name: "Display Name", count: N } }
@@ -355,7 +355,7 @@ function render() {
   // embeds alive because nothing detaches them.
   const rowSignature = selectedArtist + '|' + sortKey + '|' + sortDir + '|' + start + '|' +
     (mobileQuery.matches ? 'm|' : 'd|') +
-    page.map(s => s.url + ':' + s.totalStreams + ':' + s.dailyStreams + ':' + (s.releaseDate || '')).join(',');
+    page.map(s => s.url + ':' + s.totalStreams + ':' + s.dailyStreams + ':' + (s.releaseDate || '') + ':' + (s.genre || '')).join(',');
   if (rowSignature === lastRenderSignature) return;
   lastRenderSignature = rowSignature;
 
@@ -374,7 +374,7 @@ function render() {
     tr.innerHTML = `
       <td>${start + i + 1}</td>
       <td>${truncate(song.title, 45)}</td>
-      <td>${truncate(song.artist, 35)}</td>
+      <td>${truncate(song.artist, 35)}${song.genre ? `<div class="genre-tag">${escapeHtml(song.genre)}</div>` : ''}</td>
       <td title="${fullFormat(song.totalStreams)}">${abbreviate(song.totalStreams)}</td>
       <td title="${fullFormat(song.dailyStreams)}">${abbreviate(song.dailyStreams)}</td>
       <td class="date-cell">${formatDate(song.releaseDate)}</td>
@@ -400,6 +400,7 @@ function render() {
         <div><span>Total </span><strong>${abbreviate(song.totalStreams)}</strong></div>
         <div><span>Daily </span><strong>${abbreviate(song.dailyStreams)}</strong></div>
         <div><span>Released </span><strong>${formatDate(song.releaseDate)}</strong></div>
+        ${song.genre ? `<div><span>Genre </span><strong>${escapeHtml(song.genre)}</strong></div>` : ''}
       </div>
     `;
     mobileCards.appendChild(card);

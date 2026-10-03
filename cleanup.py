@@ -16,6 +16,7 @@ INPUT_FILE = "data.json"
 OUTPUT_FILE = "data.json.gz"
 RECENT_FILE = "recent.json.gz"       # sub-1M plausible new releases, new-releases page only
 RELEASE_DATES = "release_dates.txt"  # append-only "<track id> <YYYY-MM-DD>" registry
+GENRES = "genres.json"               # artist genres, written by genres.py (R43)
 STREAM_TOLERANCE = 0.02  # 2% tolerance for matching stream counts
 MIN_TOTAL_STREAMS = 1_000_000  # exclude songs below this threshold
 # Sub-1M records young enough to be new releases (total <= 310 x daily, the widest the
@@ -223,13 +224,26 @@ def load_release_dates():
     return dates
 
 
+def load_genres():
+    """Lowercased artist name -> genre, from genres.py's registry. Shadowed entries (a
+    lower-ranked artist sharing a name) are skipped, since songs carry names only."""
+    try:
+        with open(GENRES, encoding="utf-8") as f:
+            registry = json.load(f)
+    except FileNotFoundError:
+        return {}
+    return {e["n"].lower(): e["g"] for e in registry.values()
+            if e.get("g") and not e.get("shadowed")}
+
+
 def track_id(url):
     return (url or "").rsplit("/", 1)[-1]
 
 
-def cleanup(songs, release_dates=None):
+def cleanup(songs, release_dates=None, genres=None):
     """Run all cleanup steps. Returns (songs to ship, sub-1M new-release candidates)."""
     release_dates = release_dates or {}
+    genres = genres or {}
     # Step 1: Fix encoding, and guarantee every record has structured artist fields
     for song in songs:
         song["title"] = fix_encoding(song["title"])
@@ -320,6 +334,14 @@ def cleanup(songs, release_dates=None):
         found = [release_dates[t] for t in map(track_id, urls) if t in release_dates]
         if found:
             song["releaseDate"] = min(found)
+        # Genre (R43): a song takes the genre of its first credited artist that has
+        # one, leads before features. leads are ordered by artist rank, so a duet
+        # takes the bigger artist's genre. Omitted when no credited artist has one.
+        for name in list(song.get("leads") or []) + list(song.get("features") or []):
+            genre = genres.get(name.lower())
+            if genre:
+                song["genre"] = genre
+                break
 
     # Step 5: Filter by minimum stream threshold (SD-5). The one exception is set
     # aside, never merged back: dated sub-1M songs young enough to be new releases,
@@ -330,6 +352,8 @@ def cleanup(songs, release_dates=None):
               and s["totalStreams"] <= NEW_CANDIDATE_RATIO * s["dailyStreams"]]
     deduped = [s for s in deduped if s["totalStreams"] >= MIN_TOTAL_STREAMS]
     dated = sum(1 for s in deduped if "releaseDate" in s)
+    with_genre = sum(1 for s in deduped if "genre" in s)
+    print(f"Genres: {with_genre:,} of {len(deduped):,} songs ({with_genre / max(len(deduped), 1):.1%}).")
     print(f"Release dates: {dated:,} of {len(deduped):,} songs dated "
           f"({dated / max(len(deduped), 1):.1%}); registry holds {len(release_dates):,}. "
           f"{len(recent):,} sub-1M new-release candidates set aside.")
@@ -344,7 +368,7 @@ def main():
         songs = json.load(f)
     print(f"Loaded {len(songs)} songs.")
 
-    cleaned, recent = cleanup(songs, load_release_dates())
+    cleaned, recent = cleanup(songs, load_release_dates(), load_genres())
 
     removed = len(songs) - len(cleaned)
     print(f"Removed {removed} duplicates. Final count: {len(cleaned)} songs.")

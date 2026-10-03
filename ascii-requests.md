@@ -870,3 +870,30 @@ Updated after every request. See the maintenance protocol in `CLAUDE.md`.
         |
   (( awaiting choice, R-9 ))
 ```
+
+## R43, 3 October: "wikidata with Claude filling in the gaps if it's not too costly?"
+
+```
+  (( choice: option 4 ))   *** SD-12: held recommendation stated (same)
+        |
+        [ credentials? ] --> no key, no CLI, count_tokens fails
+        |     => build the API path dormant, fill today's gap in-session ($0)
+        |
+        [ map 620 labels -> 20 groups, spot-check 70 artists ]
+        |     !!! Ed Sheeran Hip-Hop, Taylor Swift Country, Burna Boy Reggae
+        |     !!! "folk-pop" matched "k-pop" -> Noah Kahan K-Pop
+        |     [ word boundaries; Pop wins ties; country decides markets ]
+        |     !!! Alok Brazilian, Mary J. Blige Hip-Hop -> overrides
+        |
+        [ genres.py: Wikidata pass ] --> 2,248 / 3,000
+        [ 752 gaps, 8 batches, in-session ] --> 729 genres, 23 blank (audio, noise)
+        |     !!! 4 names on 2 IDs (LISA/LiSA...) -> higher rank owns the name
+        |
+        [ cleanup: song genre from first credited artist ] --> 98.3% of songs
+        [ build: artist page lede + JSON-LD; app: genre line + card item ]
+        [ headless: 1024/1280 no overflow; true 375px card wraps ]
+        [ CI: pip anthropic, genres step w/ secret, commit genres.json ]
+        [ deploy ] [ verify live ] [ commit + push ]
+        |
+  (( genre on every song; T-5: add the API key secret for weekly gaps ))
+```

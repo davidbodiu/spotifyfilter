@@ -46,6 +46,7 @@ spotify_filter/
 +-- PIPELINE (Python, standalone, no CLI args)
 |   +-- scrape.py ............ kworb -> data.json          ~60 to 85 min, resumable
 |   +-- release_dates.py ..... Spotify embed page -> release_dates.txt   3/s, resumable
+|   +-- genres.py ............ Wikidata + Claude -> genres.json (SD-25)
 |   +-- cleanup.py ........... data.json -> data.json.gz   dedup, encoding, popularity, date
 |   +-- build_pages.py ....... data.json.gz -> public/*    pages, shards, sitemap
 |   +-- make_preload.py ...... refreshes the inlined PRELOAD block in app.js
@@ -75,6 +76,7 @@ spotify_filter/
 +-- STATE
 |   +-- slugs.json ........... append-only name -> slug registry (SD-21). COMMITTED.
 |   +-- release_dates.txt .... append-only track id -> date registry (SD-24). COMMITTED.
+|   +-- genres.json .......... artist id -> genre registry (SD-25). COMMITTED.
 |   +-- snapshots/ ........... dated archives. Local disk only, not committed.
 |   +-- data.json ............ scraper output, ~106 MB. Intermediate.
 |   +-- data.json.gz ......... cleaned, ~21.7 MB. Intermediate, feeds build_pages.
@@ -122,6 +124,15 @@ data.json ....................... 507,226 records, ~106 MB, gitignored
    v
 release_dates.txt ............... append-only, committed (SD-24)
    |
+   |  genres.py
+   |    scrape_artists() ............... same list, IDs from the kworb links
+   |    wikidata() ...................... P1902 join -> P136 labels + countries
+   |    bucket() / primary() ........... 620 labels -> 20 GENRES, country decides markets
+   |    classify_with_claude() ......... gaps only; count_tokens preflight; $2 cap
+   |    shared names -> higher rank owns, other "shadowed"
+   v
+genres.json ..................... committed, one artist per line (SD-25)
+   |
    |  cleanup.py
    |    fix_encoding() ................. latin-1 -> utf-8 round trip
    |    parse_artist_string() .......... backfill for pre-SD-13 input only
@@ -131,6 +142,7 @@ release_dates.txt ............... append-only, committed (SD-24)
    |    popularity = daily/total * 1e6
    |    drop < MIN_TOTAL_STREAMS (1,000,000)
    |    releaseDate = min(registry[id] for id in cluster _urls), omitted if none
+   |    genre = first credited artist with one in genres.json, omitted if none
    |    sub-1M with total <= 310 x daily and a date -> recent.json.gz (R39, R40)
    v
 data.json.gz .................... 321,878 songs, 19.6 MB, gitignored
@@ -205,6 +217,7 @@ SD-20  Workers Builds stays disabled ... Cloudflare dashboard (external)
 SD-21  slugs.json append-only .......... build_pages.py assign_slugs
 SD-23  popularity chart floor 400k ..... build_pages.py POP_MIN_DAILY
 SD-24  embed-page dates, 7-day window .. release_dates.py, build_pages.py NEW_RELEASE_DAYS
+SD-25  artist genre, songs inherit ..... genres.py, cleanup.py step 6
 ```
 
 ### Known dead code (deliberate, SD-8)

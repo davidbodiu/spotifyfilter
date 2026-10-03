@@ -49,7 +49,7 @@ jobs:
           python-version: '3.13'
 
       - name: Install dependencies
-        run: pip install requests beautifulsoup4
+        run: pip install requests beautifulsoup4 anthropic
 
       - name: Archive the outgoing artifact
         run: |
@@ -70,6 +70,16 @@ jobs:
         # new-releases page goes stale. The step still shows red in the run.
         continue-on-error: true
         run: python3 release_dates.py
+
+      - name: Assign genres
+        # Wikidata by Spotify artist ID, then Claude for artists Wikidata lacks (R43).
+        # Without the ANTHROPIC_API_KEY secret the Claude half is skipped and new
+        # artists stay unclassified; genres.json is committed below either way.
+        # continue-on-error: genre must never block the stream refresh.
+        continue-on-error: true
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: python3 genres.py
 
       - name: Clean, dedupe, compress
         run: python3 cleanup.py
@@ -162,7 +172,7 @@ jobs:
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add public/app.js slugs.json release_dates.txt
+          git add public/app.js slugs.json release_dates.txt genres.json
           if git diff --staged --quiet; then
             echo "Nothing changed; skipping commit."
           else

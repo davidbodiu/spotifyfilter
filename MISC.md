@@ -567,7 +567,30 @@ re-measure before moving it. The gate also means a re-dated song stays out even 
 the backfill dates its original URL, so `cleanup.py`'s earliest-across-cluster rule is
 a second line, not the first.
 
-### R-9. Genre for every song `OPEN` `DECISION`
+### T-5. Add `ANTHROPIC_API_KEY` as a GitHub Actions secret, or new artists stay genreless `OPEN` `MEDIUM`
+
+R43. The initial 752 gaps were filled in a Claude Code session, so there was no API
+cost, but the weekly 2 to 15 new artists need the API. Without the secret, `genres.py`
+skips the Claude half and logs how many stay unclassified. With it, a normal week
+costs cents, capped at `CLAUDE_MAX_USD`. To add it:
+
+```bash
+gh secret set ANTHROPIC_API_KEY
+```
+
+### I-13. Genre judgement calls worth knowing `INSIGHT`
+
+R43. Wikidata's labels are crowd-sourced, so some primaries are debatable: Billie Eilish
+and Lana Del Rey read Alternative & Indie, Michael Jackson and Hozier R&B & Soul,
+Coldplay Pop. Spanish-language rock and reggae go to Latin, as a market. Turkish acts
+go to Middle Eastern. Phonk goes to Hip-Hop & Rap, except Brazilian "montagem" acts,
+which are Brazilian. Cast recordings, game and film music go to Classical &
+Soundtrack. All of it is recorded in `genres.json` and can be overridden by editing
+the line.
+
+### R-9. Genre for every song `RESOLVED` (Wikidata plus Claude, R43)
+
+**DECIDED R43:** option 4. Original analysis below.
 
 R42. Sources measured on the real artist list: Wikidata 74% of artists (95% of the
 global top 1,000), CC0, exact join on Spotify artist ID; Apple iTunes Search 20/20 on a

@@ -32,6 +32,8 @@ import re
 import shutil
 import unicodedata
 
+from cleanup import load_genres  # artist name -> genre, from genres.json (R43)
+
 DATA = "data.json.gz"
 OUT = "public"
 REGISTRY = "slugs.json"
@@ -139,9 +141,12 @@ def artist_names(song):
     return list(song.get("leads") or []) + list(song.get("features") or [])
 
 
-def page_html(name, slug, songs, collaborators):
+def page_html(name, slug, songs, collaborators, genre=None):
     """One artist page. Real text, not a JS shell, so crawlers see content."""
     total = sum(s["totalStreams"] for s in songs)
+    group = {"@type": "MusicGroup", "name": name, "url": f"{SITE}/artist/{slug}/"}
+    if genre:
+        group["genre"] = genre
     top = songs[:SONGS_ON_PAGE]
     rows = "\n".join(
         f'      <tr><td>{i}</td><td>{esc(s["title"])}</td>'
@@ -156,7 +161,7 @@ def page_html(name, slug, songs, collaborators):
     ld = {
         "@context": "https://schema.org",
         "@graph": [
-            {"@type": "MusicGroup", "name": name, "url": f"{SITE}/artist/{slug}/"},
+            group,
             {"@type": "BreadcrumbList", "itemListElement": [
                 {"@type": "ListItem", "position": 1, "name": "ChartRank", "item": SITE},
                 {"@type": "ListItem", "position": 2, "name": "Artists",
@@ -212,7 +217,7 @@ def page_html(name, slug, songs, collaborators):
   <nav class="crumbs"><a href="/">Home</a> / <a href="/artists/">Artists</a> / {esc(name)}</nav>
 
   <h2 class="page-title">{esc(name)}: every song ranked by Spotify streams</h2>
-  <p class="page-lede">{len(songs)} songs, {total:,} total streams.
+  <p class="page-lede">{f"{esc(genre)}. " if genre else ""}{len(songs)} songs, {total:,} total streams.
      <a href="/?artist={slug}">Open in the interactive chart</a> to sort by daily plays
      or momentum and play previews.</p>
 
@@ -345,6 +350,7 @@ def new_page_html(pool, since, data_date, slug, days, siblings):
 def main():
     songs = json.load(gzip.open(DATA))
     print(f"Loaded {len(songs):,} songs.")
+    artist_genres = load_genres()
 
     by_artist = {}
     for s in songs:
@@ -387,7 +393,7 @@ def main():
 
         os.makedirs(f"{OUT}/artist/{slug}", exist_ok=True)
         with open(f"{OUT}/artist/{slug}/index.html", "w", encoding="utf-8") as f:
-            f.write(page_html(name, slug, items, collaborators))
+            f.write(page_html(name, slug, items, collaborators, artist_genres.get(name.lower())))
 
         index.append({"n": name, "s": slug, "c": len(items)})
 

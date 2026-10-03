@@ -61,7 +61,7 @@ def main():
     # releaseDate is included because render() shows it and its signature includes it:
     # a preload row without the date would never be rebuilt once the shard arrived.
     fields = ("title", "artist", "totalStreams", "dailyStreams", "url", "popularity",
-              "releaseDate")
+              "releaseDate", "genre")
     trimmed = [{k: s[k] for k in fields if k in s} for s in top]
 
     block = json.dumps(trimmed, ensure_ascii=False, separators=(",", ":"))

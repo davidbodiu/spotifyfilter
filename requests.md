@@ -41,6 +41,7 @@ silently.
 | SD-21 | `slugs.json` is append-only. A name's slug is never reassigned. | R19 | A changed slug destroys its own URL, backlinks and rankings. |
 | SD-22 | Spotify embeds are left exactly as they are, dark in both themes. | R19 | Verified: no light embed exists. User chose to leave it. |
 | SD-23 | The global **popularity** chart only ranks songs with >= 400k daily streams (`POP_MIN_DAILY`). Other sorts and per-artist views are unfiltered. | R31 | popularity = daily/total explodes near the 1M total floor; user chose a daily floor over a total floor or damped ratio. |
+| SD-25 | Genre is per **artist** and every song inherits its first credited artist's genre. Wikidata first (exact join on Spotify artist ID, labels folded into 20 groups, country used to tell markets apart), Claude for the gaps, stored in the committed `genres.json`. | R43 | User chose Wikidata with Claude filling the gaps "if it's not too costly" over Apple, Claude-only, or Wikidata-only (R42). |
 | SD-24 | Release dates come from the Spotify **embed page**, one fetch per track ID, into `release_dates.txt`, which is append-only and committed. The new-releases surface is a 7-day window (`NEW_RELEASE_DAYS`) behind a plausibility gate (`NEW_MAX_DECAY`, since Spotify re-dates singles to their album) and an edition-marker exclusion (`NEW_EDITION_MARKERS`, R36), shows the top 30 per sort including sub-1M songs (R39), and obeys the app-wide sort. A second, 30-day surface (`/new-30/`, `?artist=new-30`) sits beside the 7-day one; the 7-day one stays strict and shows however many qualify (R40). | R33, R36, R39, R40 | The Web API now needs Premium, lost batch `GET /tracks` and is retiring Client Credentials for metadata; the embed page needs nothing. User delegated the choice to research (R33) after the options were laid out in R32. |
 
 ---
@@ -1046,6 +1047,50 @@ rather than recalled, on the real 3,000-artist list (1 October to 3 October 2026
 
 Options presented per SD-12 (Wikidata; Apple; Claude; Wikidata plus Claude for gaps),
 recommendation held; awaiting the user's choice (MISC R-9).
+
+**R43. "I think wikidata with Claude filling in the gaps if it's not too costly?"**
+
+The user chose option 4 of R42. Per SD-12 the held recommendation was stated after
+the choice: the same option. Built:
+
+- **`genres.py`** (new): fetches the scraper's artist list via `scrape_artists()`,
+  queries Wikidata for genres and country by Spotify artist ID (3,000 artists in
+  about 35 seconds), folds about 620 labels into 20 groups with `bucket()` and picks
+  one per artist with `primary()`. Then Claude for the gaps, with a free token count
+  first and a `CLAUDE_MAX_USD = 2.00` per-run cap. Writes `genres.json`, one artist
+  per line, committed.
+- **Mapping, iterated against spot checks.** First pass got Ed Sheeran as Hip-Hop,
+  Taylor Swift as Country, Burna Boy as Reggae and Noah Kahan as K-Pop ("folk-pop"
+  contains "k-pop"). Fixed with word-boundary regexes, Pop winning ties among
+  sound-based groups, and the artist's country: a market label counts when it
+  matches where the artist is from (Justin Bieber's lone reggaeton label no longer
+  makes him Latin), and for Korea, Japan, South Asia, Africa and the Middle East the
+  country alone decides (Sidhu Moose Wala is South Asian). "brazilian bass" and
+  "hip-hop soul" are sounds, not markets (Alok, Mary J. Blige).
+- **No Anthropic credentials exist on this machine** (no key, no CLI login, a free
+  token count failed), so the API path could not run. The 752 gap artists were
+  instead classified in this Claude Code session from the same context the script
+  would send (top songs, collaborators, country), recorded as `src: "claude"`. No API
+  cost. 729 got a genre; 23 stay blank on purpose: children's audio dramas,
+  white-noise channels, credit-only lyricists.
+- **Shared names.** Four names belong to two artists each (LISA and LiSA, Eve,
+  SEVENTEEN, a duplicate Macklemore & Ryan Lewis ID). Songs carry names, not IDs, so
+  the higher-ranked artist owns the name and the other entry is marked `shadowed`.
+- **Pipeline:** `cleanup.py` gives each song its first credited artist's genre;
+  `build_pages.py` shows it on artist pages and in their JSON-LD; `make_preload.py`
+  inlines it; the CI workflow installs `anthropic`, runs `genres.py` with the
+  `ANTHROPIC_API_KEY` secret (absent today, so new artists stay blank until it is
+  added), and commits `genres.json`.
+- **Display:** muted genre line under the artist name in the table, a Genre item on
+  mobile cards (now wrapping), and in the render signature.
+
+Result: 2,977 of 3,000 artists, 321,007 of 326,703 songs (98.3%). Verified in
+headless Chrome: no overflow at 1,024 and 1,280px on four views, 30 genre lines per
+page, and the phone card wraps cleanly at a true 375px. `data.json.gz` 22.4 MB.
+Deployed as `098b75e3`; verified live: Billie Eilish shard 78/78 with a genre, global
+top 1,000 at 997/1,000 (the three blanks are white-noise tracks, by design), Drake's
+page lede and JSON-LD read Hip-Hop & Rap, `app.js` and `styles.css` carry the genre
+line.
 
 **R25. Related artists; then the mobile crash report; then "make it 30 on desktop" plus
 the Buy Me a Coffee widget script.**

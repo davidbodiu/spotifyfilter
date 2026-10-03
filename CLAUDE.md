@@ -122,7 +122,8 @@ Each record in `data.json.gz`:
   "dailyStreams": 812004,
   "url": "https://open.spotify.com/track/5hVghJ4KaYES3BFUATCYn0",
   "popularity": 440.6,
-  "releaseDate": "2019-05-17"
+  "releaseDate": "2019-05-17",
+  "genre": "Hip-Hop & Rap"
 }
 ```
 
@@ -216,6 +217,36 @@ date never changes, the backfill is ~330k requests, and CI runners keep nothing
 between runs. Plain text rather than gzip so git stores each week's commit as a small
 delta instead of a fresh binary blob.
 
+## `genres.py` (SD-25)
+
+Runs after the scrape. One primary genre per **artist**; songs inherit it. Two sources,
+in order:
+
+1. **Wikidata**, joined exactly on the Spotify artist ID that kworb's artist links
+   carry (P1902), for genre labels (P136) and country (P27, P495, or P740's country).
+   `bucket()` folds about 620 labels into 20 groups (`GENRES`) with ordered,
+   word-bounded regexes plus `OVERRIDES`; `primary()` picks one: a market label that
+   matches the artist's country wins, then market labels that are at least half the
+   labels, then a country that alone decides (Korea, Japan, South Asia, Africa, Middle
+   East: `ORIGIN_DECIDES`), then a vote over sound-based groups where Pop wins ties.
+   Recomputed every run; a failed query keeps last week's rows and skips Claude.
+2. **Claude** (`claude-opus-5-5`, low effort, structured output, server-side
+   fallbacks) for artists Wikidata cannot place, 50 per request, from name, top
+   songs, collaborators and country, allowed to answer Unknown. A free token count
+   runs first; without credentials the step is skipped and those artists stay blank.
+   `CLAUDE_MAX_USD = 2.00` caps a run. Claude rows persist; Wikidata wins if it later
+   gains a genre for that artist.
+
+`genres.json` is committed, keyed by Spotify artist ID, one artist per line:
+`{"n": name, "g": genre, "src": "wikidata"|"claude", "wd": labels, "c": countries}`.
+The initial 752 Claude rows (3 October 2026) were classified in a Claude Code session,
+not via the API, because no key existed; they are marked `"on": "2026-10-03"`. Four
+names are shared by two artists; the higher-ranked one owns the name, the other is
+`"shadowed": true`, because songs carry names, not IDs.
+
+Coverage on 3 October 2026: 2,977 of 3,000 artists, 98.3% of songs. The 23 blanks are
+audiobooks, white noise, children's music and lyricists with no songs.
+
 ## `cleanup.py`
 
 Post-scrape pass. Reads `data.json` and `release_dates.txt`, writes `data.json.gz` at
@@ -234,6 +265,9 @@ compression level 9.
 5. **Release date.** Looks up every member URL of a merged cluster (tracked in a
    transient `_urls` list during the merge) in the registry and keeps the earliest.
    Records with no hit get no field.
+6. **Genre.** The first credited artist with a genre in `genres.json`, leads before
+   features (leads are rank-ordered, so a duet takes the bigger artist's genre).
+   Omitted when none has one.
 
 Output is sorted by `totalStreams` descending.
 
@@ -366,7 +400,9 @@ A crawlable `public/new/index.html` mirrors the artist pages (top 50 as text, JS
 with `datePublished`, in the sitemap).
 
 Every row, on every surface, now shows a **Released** column (table) or line (mobile
-card), an en dash when unknown. The render signature includes `releaseDate`, and
+card), an en dash when unknown. Every row also shows its **genre** (SD-25) as a muted
+line under the artist name, and as a Genre item on the mobile card, whose stats now
+wrap onto two lines at phone widths. Both fields are in the render signature. The render signature includes `releaseDate`, and
 `make_preload.py` inlines it, otherwise the preload rows would never be rebuilt once
 the shard arrived and the first ten Billie Eilish rows would show no date.
 
@@ -466,6 +502,8 @@ full value is available on hover. Applied at 45 chars for title, 35 for artist.
 | `NEW_CAP` | build_pages.py, app.js | 30 | Top 30 per sort on the new-releases page (R39) |
 | `NEW_CANDIDATE_RATIO` | release_dates.py, cleanup.py | 310 | Sub-1M songs with total <= 310 x daily are dated and kept for the new-releases pages |
 | `NEW_WINDOWS` | build_pages.py | 7, 30 days | One entry per new-releases surface; mirror in `NEW_SURFACES` in app.js |
+| `CLAUDE_MAX_USD` | genres.py | 2.00 | Hard spending cap per run for the Claude gap-filler |
+| `GENRES` | genres.py | 20 groups | The only values a song's `genre` can take |
 | `PACE` | release_dates.py | 3.0 | Embed fetches per second; 9/s drew 429s, 3/s never has |
 | `MAX_FETCHES` | release_dates.py | 6000 | Per-run budget; env `RELEASE_DATES_MAX` overrides |
 | `DEFAULT_ARTIST` | app.js | 'Billie Eilish' | Must match `PRELOAD` |
@@ -563,6 +601,7 @@ Current deploy: 6,011 files, ~154 MB, largest single file 684 KB.
 # Full refresh and publish (~60 to 85 min, resumable)
 python3 scrape.py        # writes data.json
 python3 release_dates.py # appends new track IDs to release_dates.txt (commit it)
+python3 genres.py        # refreshes genres.json (commit it); Claude needs ANTHROPIC_API_KEY
 python3 cleanup.py       # writes data.json.gz (build intermediate, not deployed)
 ./deploy.sh              # builds the generated surface, gates on limits, publishes
 
@@ -579,7 +618,9 @@ cd public && python3 -m http.server 8000
 - `scrape.py`: kworb scraper
 - `release_dates.py`: Spotify embed page scraper, one fetch per new track ID
 - `release_dates.txt`: append-only track ID to release date registry (SD-24). Committed.
-- `cleanup.py`: dedup, encoding fix, popularity, release date, compression; also writes
+- `genres.py`: artist genres from Wikidata, Claude for the gaps (SD-25)
+- `genres.json`: artist genre registry, keyed by Spotify artist ID. Committed.
+- `cleanup.py`: dedup, encoding fix, popularity, release date, genre, compression; also writes
   `recent.json.gz`, the sub-1M new-release candidates (not committed)
 - `build_pages.py`: generates artist pages, per-artist shards, the global chart, the
   7- and 30-day new-releases files and pages, the A-Z hub and the sitemap. Owns
