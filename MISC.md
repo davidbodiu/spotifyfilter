@@ -374,7 +374,12 @@ artist".
 **those archives currently exist only on local disk** and need a durable home once D2/D3
 are settled.
 
-### G-6. chartrank.app returns HTTP 403 to every non-browser client `OPEN` `CRITICAL`
+### G-6. chartrank.app returns HTTP 403 to every non-browser client `FIXED` (no longer reproduces)
+
+**3 October 2026 (R45):** every client tested gets 200 on `/`, `/robots.txt`,
+`/sitemap.xml` and `/artist/drake/`: plain curl, Googlebot, Bingbot, a browser, and
+the Facebook, Twitter and Slack preview bots. Whatever challenge was in place has been
+removed. Original report kept below.
 
 Confirmed by request: `https://chartrank.app/` and `https://chartrank.app/robots.txt`
 both return **403** with a `cf-mitigated: challenge` header. A Cloudflare bot mitigation
@@ -501,6 +506,53 @@ slowed, version, edit, remaster), which catches this and the Ben&Ben "Reimagined
 pair at the cost of hiding genuinely new remixes; or accept that Spotify's release
 date is per edition and say so on the page.
 
+### G-23. The 7-day new-releases page depends on which day the refresh runs `OPEN` `DECISION`
+
+R44. The window is the seven days before the data date. The design assumed Monday
+runs, which catch the previous Friday's releases three days on. A manual Saturday run
+(3 October) started its window on 26 September, missed the 25 September releases, and
+the 2 October releases were one day old, too new for kworb to list (I-10): the live page
+went to 0 songs and was rolled back. Two consequences: trigger manual refreshes on
+Mondays only, and a Monday window itself relies on kworb listing Friday releases within
+three days, so it may be thin; the 5 October run will show how thin. If it is, the
+options include ending the window a few days before the data date, or anchoring it to
+the most recent Friday kworb has had time to list. Either changes the strict 7-day rule
+the user chose in R40, so it needs their decision.
+
+### G-20. Only the homepage is in search results `OPEN` `HIGH`
+
+R45. `site:chartrank.app` returns the homepage only. Causes, all fixable: no Search
+Console or Bing Webmaster verification, so the sitemap was never submitted; the
+homepage has no crawlable links into the artist pages (only icons and the manifest);
+the sitemap has no `<lastmod>`; artist page titles say "Every Song Ranked" while people
+search "most streamed songs" and "songs ranked by streams". Search is the only channel
+that brings visitors without someone posting a link. The no-trade-off fixes:
+homepage link block (popular artists, A-Z, new releases), `<lastmod>` from the data
+date, search-matched titles, IndexNow ping to Bing and Yandex after each deploy, and
+Search Console submission (needs the user).
+
+### G-21. The site has no analytics `OPEN` `HIGH`
+
+R45. No beacon or analytics script on any page, so visitors, referrers and top pages
+are unknown and no change to discovery can be measured. Cloudflare Web Analytics is
+free, cookieless, needs no consent banner and can be switched on for a proxied domain
+in the dashboard with no code change.
+
+### G-22. The site is also public at spotifyfilter.bodiud.workers.dev `OPEN` `LOW`
+
+R45. Same content on a second hostname. Canonical tags on the artist pages point at
+chartrank.app, which limits the harm, but `workers_dev: false` in `wrangler.jsonc`
+removes the duplicate outright.
+
+### B-21. A push to main during a CI run skips that week's deploy `FIXED` (R44)
+
+**Fixed 4 October:** the Commit step runs `git pull --rebase` before `git push`.
+
+R45. The workflow's Commit step runs `git push` with no pull first. If main moved
+since checkout, the push is rejected, the step fails, and the Deploy step after it
+never runs. Fix: `git pull --rebase` before the push; the committed files are
+line-based registries, so conflicts are unlikely.
+
 ### G-19. New releases cannot reach 30 inside 7 days `RESOLVED` (R40: keep 7 strict, add 30-day page)
 
 **DECIDED R40.** The 7-day page stays strict and shows however many qualify; a 30-day
@@ -567,7 +619,10 @@ re-measure before moving it. The gate also means a re-dated song stays out even 
 the backfill dates its original URL, so `cleanup.py`'s earliest-across-cluster rule is
 a second line, not the first.
 
-### T-5. Add `ANTHROPIC_API_KEY` as a GitHub Actions secret, or new artists stay genreless `OPEN` `MEDIUM`
+### T-5. Add `ANTHROPIC_API_KEY` as a GitHub Actions secret, or new artists stay genreless `DONE` (R44)
+
+**Done 3 October.** Secret added by the user; verified in CI run 37155414233: seven
+artists classified in one request for $0.01, matching the in-session answers 7/7.
 
 R43. The initial 752 gaps were filled in a Claude Code session, so there was no API
 cost, but the weekly 2 to 15 new artists need the API. Without the secret, `genres.py`
@@ -587,6 +642,23 @@ go to Middle Eastern. Phonk goes to Hip-Hop & Rap, except Brazilian "montagem" a
 which are Brazilian. Cast recordings, game and film music go to Classical &
 Soundtrack. All of it is recorded in `genres.json` and can be overridden by editing
 the line.
+
+### R-10. Pages that match what people search for `OPEN` `DECISION`
+
+R45. Search suggestions show demand the site has no page for: "most streamed songs of
+2025", "most streamed hip hop songs on spotify", "how many streams does blinding lights
+have". Candidates: genre pages (20, possible since R43), year pages (about 27, from
+`releaseDate`), song pages (the biggest long tail, but 326,703 songs against the
+20,000-file free-plan limit: static top-N, Worker rendering on demand, or neither), and
+per-artist share images for better link previews. Real trade-offs; present per SD-12.
+
+### I-14. How people phrase these searches `INSIGHT`
+
+R45, from public search suggestions: "[artist] most streamed songs", "[artist] most
+streamed song on spotify", "[artist] songs ranked by streams", "most streamed songs of
+[year] (spotify, kworb)", "most streamed [genre] songs of all time on spotify", "how
+many streams does [song] have", "new music releases this week spotify". kworb is named
+in suggestions itself; chartmasters and soundcharts rank for the generic terms.
 
 ### R-9. Genre for every song `RESOLVED` (Wikidata plus Claude, R43)
 

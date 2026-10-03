@@ -1092,6 +1092,65 @@ top 1,000 at 997/1,000 (the three blanks are white-noise tracks, by design), Dra
 page lede and JSON-LD read Hip-Hop & Rap, `app.js` and `styles.css` carry the genre
 line.
 
+**R44. "added api key"**
+
+`ANTHROPIC_API_KEY` confirmed in the repo's Actions secrets (added 21:27 UTC, 3 October;
+not set locally). The Claude path had never run against the real API, so: hardened it
+first (an API error inside the loop crashed `genres.py` before it wrote `genres.json`,
+which would also have lost the week's Wikidata refresh; now it warns and keeps going),
+mock-tested request shape, parsing and error handling, re-queued seven artists from the
+in-session batch so the run must call the API, and triggered the workflow manually
+(run 37155414233).
+
+**Closing note, 4 October.** The run succeeded end to end (1 h 25 min). The genre step
+called Claude for the seven re-queued artists in one request, $0.01, and all seven
+answers matched the in-session ones, Unknown for Dakota included. Release dates fetched
+2,042 new IDs; 98.3% of songs carry a genre; the bot committed and deployed
+(`599d584f`).
+
+**Regression caused by running on a Saturday:** the 7-day new-releases window is the
+seven days before the data date. A Monday run catches the previous Friday; this
+Saturday run's window started 26 September, missing the 25 September releases, and the
+2 October releases were a day old, too new for kworb (I-10). The live 7-day page went
+to 0 songs. Rolled back with `wrangler rollback` to `098b75e3` (the 3 October morning
+deploy, 30 September data, 21 songs), verified live; Monday's scheduled run replaces it.
+Recorded as G-23 with the open question of how thin a Monday window will be.
+
+Also fixed B-21 (the CI commit step now rebases before pushing).
+
+**R45. Screenshot of the r/InternetIsBeautiful post (245 upvotes, 31 comments, 119K
+views, six months old): "The reddit post attached did very well but ever since not
+getting any visitors. What can you do so that we increase chances of getting visitors?
+Do you need any data?"**
+
+Question; no code changed. Measured, 3 October 2026:
+
+- **G-6 no longer reproduces.** Plain curl, Googlebot, Bingbot, a browser, and the
+  Facebook, Twitter and Slack preview bots all get 200 on `/`, `/robots.txt`,
+  `/sitemap.xml` and an artist page. Crawlers can reach the site.
+- **Only the homepage is in search results.** A `site:chartrank.app` search returns
+  the homepage alone: none of the 2,998 artist pages, the A-Z hub or the new-releases
+  pages. No Google or Bing verification record exists (no DNS TXT, no meta tag), so the
+  sitemap has almost certainly never been submitted.
+- **The homepage links to nothing a crawler can follow.** Its only `href`s are icons and
+  the manifest; artist pages are reachable from the sitemap alone.
+- **No analytics on the site at all**, so traffic, referrers and top pages are unknown.
+- **Titles miss the searches.** Search suggestions show "drake most streamed songs",
+  "taylor swift songs ranked by streams", "most streamed songs of 2025", "most streamed
+  hip hop songs on spotify", "how many streams does blinding lights have", "new music
+  releases this week spotify". Artist pages say "Every Song Ranked"; no page targets
+  years, genres or single songs.
+- **A public duplicate at the workers.dev address** (canonical tags point to
+  chartrank.app, which limits the damage).
+- Found in passing: the CI commit step pushes without pulling, so any push to main
+  during a run rejects the bot's push and skips the deploy (B-21). Commits from this
+  request were held until run 37155414233 finished.
+
+Presented: no-trade-off fixes ready to apply on request, SD-12 options for new search
+pages (genre, year, song pages; per-artist share images), distribution only the user can
+do, and the data needed (Search Console, analytics, goals). Awaiting the user's answer
+(MISC G-20, G-21, R-10).
+
 **R25. Related artists; then the mobile crash report; then "make it 30 on desktop" plus
 the Buy Me a Coffee widget script.**
 

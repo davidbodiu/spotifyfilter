@@ -897,3 +897,48 @@ Updated after every request. See the maintenance protocol in `CLAUDE.md`.
         |
   (( genre on every song; T-5: add the API key secret for weekly gaps ))
 ```
+
+## R44, 3 October: "added api key"
+
+```
+  (( secret added ))
+        |
+        [ gh secret list ] --> ANTHROPIC_API_KEY present; not set locally
+        |     => only CI can exercise the Claude path; it has never run for real
+        |
+        !!! an API error inside the Claude loop would crash genres.py before it
+        !!! writes genres.json (and lose the week's Wikidata refresh)
+        [ harden: warn and keep going; mock-test shape, parsing, errors ]
+        [ re-queue 7 in-session artists so the run must call the API ]
+        [ commit + push ] [ gh workflow run ] --> run 37155414233
+        |
+        [ run: success, 1 h 25 min ]
+        |     genres: 7 artists, 1 request, $0.01, 7/7 = in-session answers
+        |     release dates: 2,042 new IDs; deploy 599d584f
+        |     !!! 7-day window 26 Sep - 3 Oct: 0 songs (Saturday run missed the
+        |     !!! 25 Sep Friday; 2 Oct releases too new for kworb)
+        [ wrangler rollback -> 098b75e3 ] --> 21 songs back; verified live   (G-23)
+        [ CI commit step: pull --rebase before push ]   (B-21 fixed)
+        |
+  (( API key verified; Monday run replaces the rollback ))
+```
+
+## R45, 3 October: "reddit post did well, now no visitors. what can you do? data?"
+
+```
+  (( question ))
+        |
+        [ crawler access, 7 user agents x 4 URLs ] --> all 200  => G-6 fixed
+        [ site:chartrank.app ] --> homepage only; 2,998 artist pages absent
+        [ verification records ] --> none: no Search Console, no Bing
+        [ homepage hrefs ] --> icons only; nothing leads to artist pages
+        [ analytics ] --> none
+        [ search suggestions ] --> "most streamed songs", "of 2025", "hip hop",
+        |                           "how many streams does X have": no matching pages
+        [ workers.dev ] --> public duplicate (canonicals mitigate)
+        !!! CI commit step pushes without pulling -> held commits until run ends (B-21)
+        |
+        [ fixes ready | SD-12 options for new pages | data needed from user ]
+        |
+  (( awaiting answer: G-20, G-21, R-10 ))
+```

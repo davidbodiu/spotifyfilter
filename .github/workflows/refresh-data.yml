@@ -177,6 +177,9 @@ jobs:
             echo "Nothing changed; skipping commit."
           else
             git commit -m "chore: weekly data refresh $(date -u +%Y-%m-%d)"
+            # Rebase onto anything pushed while the run was going (B-21). A plain push
+            # was rejected in that case, failing this step and skipping the deploy.
+            git pull --rebase
             git push
           fi
 

@@ -247,6 +247,11 @@ names are shared by two artists; the higher-ranked one owns the name, the other 
 Coverage on 3 October 2026: 2,977 of 3,000 artists, 98.3% of songs. The 23 blanks are
 audiobooks, white noise, children's music and lyricists with no songs.
 
+**The Claude path is verified** (R44): the `ANTHROPIC_API_KEY` Actions secret exists,
+and CI run 37155414233 classified seven re-queued artists in one request for $0.01,
+agreeing with the in-session answers 7/7. A request error now stops the Claude loop
+with a warning and keeps finished answers; the registry is always written.
+
 ## `cleanup.py`
 
 Post-scrape pass. Reads `data.json` and `release_dates.txt`, writes `data.json.gz` at
@@ -389,6 +394,10 @@ date and streams exactly like a new release, so the decay gate cannot see it. Ti
 containing remix, bonus, reimagined, deluxe, live, acoustic, sped up, slowed, version,
 edit, remaster, instrumental or demo are dropped from the pool. The user accepted that
 a genuinely new remix is hidden as a result.
+
+**Run day matters** (G-23). The 7-day window ends at the data date, so a refresh on any
+day but Monday shifts it. A manual Saturday run emptied the page and was rolled back.
+Trigger manual refreshes on Mondays.
 
 The surface obeys the app-wide sort select like everything else. Measured on the
 10 August data: the top 30 by total and by daily streams among freshly released songs
@@ -575,6 +584,10 @@ code, commit and push it, or the next scheduled run undoes the behaviour.
 CI also uploads each week's `data.json.gz` as a GitHub Actions artifact (90-day
 retention), because the runner-local `snapshots/` copy dies with the runner.
 
+The Commit step rebases before pushing (B-21), so a push to main during a run no longer
+rejects the bot's commit and skips the deploy. To undo a bad deploy:
+`npx wrangler rollback <version-id> --name spotifyfilter`.
+
 `deploy.sh` runs `build_pages.py` and `make_preload.py` first, because the generated
 surface is not committed (SD-19), then gates on the 25 MiB per-file cap and the 20,000
 free-plan file limit before calling `wrangler deploy`.
@@ -632,7 +645,8 @@ cd public && python3 -m http.server 8000
 - `favicon.ico` / `icon.svg` / `apple-touch-icon.png` / `icon-192.png` / `icon-512.png`
   / `manifest.webmanifest`: icon set, all drawn from the same three-bar geometry as the
   inline header mark
-- `robots.txt`: permissive; revisit when per-artist pages exist
+- `robots.txt`: permissive, names the sitemap. Crawlers reach every page (G-6 fixed);
+  only the homepage is indexed so far (G-20)
 - `snapshots/`: dated copies of past `data.json.gz`, for future time-window deltas
 - `data.json.gz`: generated dataset, NOT committed (SD-19)
 - `scrape_progress.json`: temporary resume file, auto-deleted on success
