@@ -61,7 +61,9 @@ spotify_filter/
 |       +-- data/artist/<slug>.json .............. 2,998 shards, ~7 KB each
 |       +-- data/global.json ..................... top 1,000 per sort
 |       +-- data/new.json ........................ released in the last 7 days
-|       +-- new/index.html ....................... crawlable new-releases page
+|       +-- data/new30.json ...................... released in the last 30 days
+|       +-- new/index.html ....................... crawlable new-releases page, 7 days
+|       +-- new-30/index.html .................... crawlable new-releases page, 30 days
 |       +-- artists/index.html ................... A-Z hub
 |       +-- sitemap.xml .......................... 3,000 URLs
 |
@@ -129,7 +131,7 @@ release_dates.txt ............... append-only, committed (SD-24)
    |    popularity = daily/total * 1e6
    |    drop < MIN_TOTAL_STREAMS (1,000,000)
    |    releaseDate = min(registry[id] for id in cluster _urls), omitted if none
-   |    sub-1M with total <= 80 x daily and a date -> recent.json.gz (R39)
+   |    sub-1M with total <= 310 x daily and a date -> recent.json.gz (R39, R40)
    v
 data.json.gz .................... 321,878 songs, 19.6 MB, gitignored
    |                              discards 36.5%: 175,256 sub-1M + 10,092 merged
@@ -140,13 +142,14 @@ data.json.gz .................... 321,878 songs, 19.6 MB, gitignored
    |    co-occurrence map .............. 12 collaborator links per page
    |    page_html() .................... 50 songs as text + MusicGroup/
    |                                     BreadcrumbList/ItemList JSON-LD
+   |    for each NEW_WINDOWS (7, 30 days):
    |    new_releases() ................. songs + recent.json.gz;
    |                                     releaseDate >= data date - NEW_RELEASE_DAYS,
    |                                     decay gate, NEW_EDITION_MARKERS,
    |                                     ship top-30 union by total and by daily
    |    new_page_html() ................ /new/ with datePublished JSON-LD
    v
-public/{artist,artists,new,data,sitemap.xml}
+public/{artist,artists,new,new-30,data,sitemap.xml}
    |
    |  make_preload.py ................. rewrites PRELOAD in app.js so the render
    |                                    signature guard keeps matching (B-6)
@@ -177,6 +180,7 @@ index.html
            |-- songsForArtist(sel)
            |     |-- GLOBAL_KEY -> data/global.json  (capped 1,000, per sort)
            |     |-- NEW_KEY    -> data/new.json     (window shipped as newWindow)
+           |     |-- NEW30_KEY  -> data/new30.json   (same shape, 30 days)
            |     +-- artist     -> data/artist/<slug>.json  (cached in shardCache)
            |-- sortFiltered()
            +-- render()

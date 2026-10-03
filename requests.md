@@ -41,7 +41,7 @@ silently.
 | SD-21 | `slugs.json` is append-only. A name's slug is never reassigned. | R19 | A changed slug destroys its own URL, backlinks and rankings. |
 | SD-22 | Spotify embeds are left exactly as they are, dark in both themes. | R19 | Verified: no light embed exists. User chose to leave it. |
 | SD-23 | The global **popularity** chart only ranks songs with >= 400k daily streams (`POP_MIN_DAILY`). Other sorts and per-artist views are unfiltered. | R31 | popularity = daily/total explodes near the 1M total floor; user chose a daily floor over a total floor or damped ratio. |
-| SD-24 | Release dates come from the Spotify **embed page**, one fetch per track ID, into `release_dates.txt`, which is append-only and committed. The new-releases surface is a 7-day window (`NEW_RELEASE_DAYS`) behind a plausibility gate (`NEW_MAX_DECAY`, since Spotify re-dates singles to their album) and an edition-marker exclusion (`NEW_EDITION_MARKERS`, R36), shows the top 30 per sort including sub-1M songs (R39), and obeys the app-wide sort. | R33, R36, R39 | The Web API now needs Premium, lost batch `GET /tracks` and is retiring Client Credentials for metadata; the embed page needs nothing. User delegated the choice to research (R33) after the options were laid out in R32. |
+| SD-24 | Release dates come from the Spotify **embed page**, one fetch per track ID, into `release_dates.txt`, which is append-only and committed. The new-releases surface is a 7-day window (`NEW_RELEASE_DAYS`) behind a plausibility gate (`NEW_MAX_DECAY`, since Spotify re-dates singles to their album) and an edition-marker exclusion (`NEW_EDITION_MARKERS`, R36), shows the top 30 per sort including sub-1M songs (R39), and obeys the app-wide sort. A second, 30-day surface (`/new-30/`, `?artist=new-30`) sits beside the 7-day one; the 7-day one stays strict and shows however many qualify (R40). | R33, R36, R39, R40 | The Web API now needs Premium, lost batch `GET /tracks` and is retiring Client Credentials for metadata; the embed page needs nothing. User delegated the choice to research (R33) after the options were laid out in R32. |
 
 ---
 
@@ -960,6 +960,36 @@ the deploy filled the Released column site-wide two days before Monday's CI run.
 verified live: `new.json` 21 songs (10 below 1M), Billie Eilish shard 78 of 78 dated
 with no sub-1M rows leaking in, `app.js` carries `NEW_CAP`, data vintage unchanged. Built with the data
 file's mtime pinned to the 30 September vintage so the window did not move (G-17).
+
+**R40. "Add a new page for 30 days also then"**
+
+The user's answer to G-19: keep the 7-day page strict (it shows however many qualify,
+21 this week) and add a 30-day page beside it. Not a clash: it adds a surface and
+reverses nothing.
+
+Built: `NEW_WINDOWS` in `build_pages.py` drives both surfaces through one code path
+(`new_releases(songs, date, days)`, `new_page_html(...)` with canonical, deep link
+and a cross-link to the sibling page). `data/new30.json`, `/new-30/`, in the sitemap.
+`app.js`: `NEW30_KEY`, `NEW_SURFACES` maps each key to its file, a "New releases
+(last 30 days)" dropdown row (also matched by "month"), `?artist=new-30`. A defect in
+my own edit was caught before shipping: `fetchJson` caches by its second argument and
+both files were given one label, so the 30-day view would have shown the 7-day list;
+the cache key is now the file path. `NEW_CANDIDATE_RATIO` widened from 80 to 310
+(10 x 31, the widest ratio the gate passes in a 30-day window) in `release_dates.py`
+and `cleanup.py`: 3,556 more sub-1M candidates dated (the first run paused when the
+Mac slept on battery with the lid closed; resumed with `caffeinate`), 4,792 set aside.
+
+Result on the 30 September data: 7 days 21 songs (unchanged), 30 days 686 qualify, 30
+shown. Every song in both 30-day top 30s has a decay ratio of 7.3 or less; the
+borderline drops (10 to 20) look like the pre-release singles R33 measured at 10 to 18
+(Kim Petras, Ellie Goulding, D-Block Europe), so the gate holds at 30 days.
+Observation, no action: Brazilian "Ao Vivo" (live) titles pass the edition filter,
+which matches only the English word, and they are mostly original songs released as
+live recordings (I-11).
+
+Deployed as `5d4b6bb4`; verified live: `new.json` 7 days, 21 songs; `new30.json` 30
+days (31 August to 30 September), 39 shipped for the two top 30s; `/new/` and
+`/new-30/` return 200; `app.js` carries `NEW30_KEY`; both pages are in the sitemap.
 
 **R25. Related artists; then the mobile crash report; then "make it 30 on desktop" plus
 the Buy Me a Coffee widget script.**

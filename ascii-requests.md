@@ -801,3 +801,26 @@ Updated after every request. See the maintenance protocol in `CLAUDE.md`.
         |
   (( awaiting choice, G-19 ))
 ```
+
+## R40, 3 October: "Add a new page for 30 days also then"
+
+```
+  (( G-19 answered: keep 7 strict, add 30 ))
+        |
+        [ NEW_CANDIDATE_RATIO 80 -> 310 ] --> 3,556 more sub-1M to date
+        |     !!! fetch stalled at 2,000: Mac slept on battery, lid closed
+        |     [ resume under caffeinate ] --> 1,556 more, 0 errors
+        |
+        [ build_pages: NEW_WINDOWS drives both; cross-links; sitemap ]
+        [ app.js: NEW30_KEY, NEW_SURFACES, dropdown row, ?artist=new-30 ]
+        |     !!! own defect: fetchJson cache shared one key for both files
+        |         => 30-day view would show the 7-day list; key by path
+        |
+        [ rebuild, mtime pinned ] --> 7d: 21   30d: 686 qualify, 30 shown
+        [ inspect ] --> top-30 decay ratios <= 7.3; borderline drops = pre-release
+        |               singles (10-20); "Ao Vivo" passes (I-11)
+        [ headless Chrome ] --> both surfaces render
+        [ deploy ] [ verify live ] [ commit + push ]
+        |
+  (( 30-day page live; G-19 resolved ))
+```

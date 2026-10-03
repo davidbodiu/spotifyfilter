@@ -18,9 +18,10 @@ RECENT_FILE = "recent.json.gz"       # sub-1M plausible new releases, new-releas
 RELEASE_DATES = "release_dates.txt"  # append-only "<track id> <YYYY-MM-DD>" registry
 STREAM_TOLERANCE = 0.02  # 2% tolerance for matching stream counts
 MIN_TOTAL_STREAMS = 1_000_000  # exclude songs below this threshold
-# Sub-1M records young enough to be new releases (total <= 80 x daily) are kept aside
-# in RECENT_FILE for the new-releases page (R39). Keep in step with release_dates.py.
-NEW_CANDIDATE_RATIO = 80
+# Sub-1M records young enough to be new releases (total <= 310 x daily, the widest the
+# decay gate passes in the 30-day window) are kept aside in RECENT_FILE for the
+# new-releases pages (R39, R40). Keep in step with release_dates.py.
+NEW_CANDIDATE_RATIO = 310
 
 
 def fix_encoding(text):

@@ -501,7 +501,10 @@ slowed, version, edit, remaster), which catches this and the Ben&Ben "Reimagined
 pair at the cost of hiding genuinely new remixes; or accept that Spotify's release
 date is per edition and say so on the page.
 
-### G-19. New releases cannot reach 30 inside 7 days `OPEN` `DECISION`
+### G-19. New releases cannot reach 30 inside 7 days `RESOLVED` (R40: keep 7 strict, add 30-day page)
+
+**DECIDED R40.** The 7-day page stays strict and shows however many qualify; a 30-day
+page was added beside it and fills its 30 (686 qualify on the 30 September data).
 
 R39. With sub-1M songs included, 21 qualify for 23 to 30 September. The source is the
 limit: kworb lists a new track on an artist page roughly a week after release, so the
@@ -509,6 +512,14 @@ young candidates bunch at 8 to 30 days old. Measured pool sizes: 7 days 21, 10 d
 25, 14 days 211; gate 20 at 7 days 29. Options: widen to 14 days (always 30, but
 "new" stretches to two Fridays); relax the decay gate (29, readmits pre-release singles
 R33 excluded); keep 7 days and show however many exist (21 this week, varies weekly).
+
+### I-11. Brazilian "Ao Vivo" titles pass the edition filter `INSIGHT`
+
+R40. `NEW_EDITION_MARKERS` matches English words only, so "Meu Silêncio - Ao Vivo" and
+"Plano C - Ao Vivo" sit in the 30-day top 30. That is probably right: sertanejo acts
+routinely release original songs as live recordings, so for them "live" is the first
+release, not a new edition. If a live re-recording of an old Brazilian hit ever shows
+up, "ao vivo" is the word to add.
 
 ### I-10. kworb lists new tracks about a week late `INSIGHT`
 

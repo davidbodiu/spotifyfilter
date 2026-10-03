@@ -36,15 +36,24 @@ const GLOBAL_CAP = 1000;
 // itself so the results line can say what "new" means for this data vintage.
 const NEW_KEY = '__new__';
 const NEW_LABEL = 'New releases (last 7 days)';
-// Top 30 per sort (R39). new.json ships the union of the top 30 by total and by daily,
-// so the cap must come AFTER sorting, exactly like GLOBAL_CAP.
+// The 30-day page (R40): same shape, wider window. Keys, files and the days in the
+// labels must match NEW_WINDOWS in build_pages.py.
+const NEW30_KEY = '__new30__';
+const NEW30_LABEL = 'New releases (last 30 days)';
+const NEW_SURFACES = {
+  [NEW_KEY]: 'data/new.json',
+  [NEW30_KEY]: 'data/new30.json',
+};
+// Top 30 per sort (R39). Each file ships the union of the top 30 by total and by
+// daily, so the cap must come AFTER sorting, exactly like GLOBAL_CAP.
 const NEW_CAP = 30;
-let newWindow = null;   // { since, until, days } once data/new.json has loaded
+let newWindow = null;   // { since, until, days } of the surface last loaded
 
-// Deep-link slugs for the two non-artist surfaces.
+// Deep-link slugs for the non-artist surfaces.
 const SURFACES = {
   global: { key: GLOBAL_KEY, label: GLOBAL_LABEL },
   new: { key: NEW_KEY, label: NEW_LABEL },
+  'new-30': { key: NEW30_KEY, label: NEW30_LABEL },
 };
 
 // Related artists. Derived from the artist's own shard, which already contains exactly
@@ -151,7 +160,7 @@ function buildArtistIndex(entries) {
   artistIndex = {};
   for (const e of entries) {
     const key = e.n.toLowerCase();
-    if (key === GLOBAL_KEY || key === NEW_KEY) {
+    if (key === GLOBAL_KEY || key in NEW_SURFACES) {
       console.warn('An artist is named ' + key + '; a surface key collides.');
       continue;
     }
@@ -200,8 +209,10 @@ async function songsForArtist(artistName) {
     const glob = await fetchJson('data/global.json', 'global');
     return (glob[sortKey] || glob.totalStreams).slice();
   }
-  if (artistName === NEW_KEY) {
-    const data = await fetchJson('data/new.json', 'new');
+  if (artistName in NEW_SURFACES) {
+    // Cache by file, not by a shared label: one key for both would serve the 7-day
+    // list on the 30-day surface.
+    const data = await fetchJson(NEW_SURFACES[artistName], NEW_SURFACES[artistName]);
     newWindow = { since: data.since, until: data.until, days: data.days };
     return data.songs.slice();
   }
@@ -227,7 +238,7 @@ function isGlobal() {
 }
 
 function isNew() {
-  return selectedArtist === NEW_KEY;
+  return selectedArtist in NEW_SURFACES;
 }
 
 function sortLabel() {
@@ -537,9 +548,12 @@ artistInput.addEventListener('input', () => {
     'global chart all artists'.includes(query) || 'all'.startsWith(query);
   const wantsNew = query.length <= 2 ||
     'new releases last 7 days'.includes(query) || 'latest'.startsWith(query);
+  const wantsNew30 = query.length <= 2 ||
+    'new releases last 30 days'.includes(query) || 'month'.startsWith(query);
   const rows = matches.slice(0, 15);
-  // No count on either surface row: the global chart is the top 1,000 PER SORT
-  // (largely different sets), and the new-releases pool changes size every week.
+  // No count on any surface row: the global chart is the top 1,000 PER SORT
+  // (largely different sets), and the new-releases pools change size every week.
+  if (wantsNew30) rows.unshift({ name: NEW30_LABEL, key: NEW30_KEY, count: null });
   if (wantsNew) rows.unshift({ name: NEW_LABEL, key: NEW_KEY, count: null });
   if (wantsGlobal) rows.unshift({ name: GLOBAL_LABEL, key: GLOBAL_KEY, count: null });
 

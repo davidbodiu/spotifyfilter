@@ -55,12 +55,13 @@ RAW_INPUT = "data.json"
 CLEAN_INPUT = "data.json.gz"
 REGISTRY = "release_dates.txt"
 MIN_TOTAL_STREAMS = 1_000_000          # keep in step with cleanup.py
-# Below the floor, only plausible new releases are dated (R39): the new-releases page
-# draws on them to reach its top 30, while the rest of the site keeps the 1M floor
+# Below the floor, only plausible new releases are dated (R39): the new-releases pages
+# draw on them to reach their top 30, while the rest of the site keeps the 1M floor
 # (SD-5). A song can only pass build_pages.py's decay gate if total/daily is at most
-# NEW_MAX_DECAY * (NEW_RELEASE_DAYS + 1) = 10 * 8, so nothing above that is fetched.
-# ~1,300 candidates in a weekly scrape, ~7 minutes at PACE.
-NEW_CANDIDATE_RATIO = 80
+# NEW_MAX_DECAY * (longest window + 1) = 10 * 31 for the 30-day page (R40), so nothing
+# above that is fetched. ~4,800 candidates in a scrape; after the first run only the
+# new ones (most are dated in earlier weeks).
+NEW_CANDIDATE_RATIO = 310
 EMBED_URL = "https://open.spotify.com/embed/track/{}"
 
 MAX_FETCHES = int(os.environ.get("RELEASE_DATES_MAX", "6000"))   # ~33 min at 3/s

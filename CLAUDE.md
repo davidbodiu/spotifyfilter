@@ -314,14 +314,20 @@ they diverge only for this surface.
 
 `NEW_KEY` (`'__new__'`) is the second sentinel surface, built exactly like the global
 chart: a synthetic dropdown row, a deep link (`?artist=new`), one precomputed file.
+**A 30-day twin** (R40) uses the same code path: `NEW_WINDOWS` in `build_pages.py`
+lists `(slug, days, file)` for both, `NEW_SURFACES` in `app.js` maps `NEW_KEY` and
+`NEW30_KEY` (`'__new30__'`) to `data/new.json` and `data/new30.json`, and the static
+pages are `/new/` and `/new-30/`, each linking to the other. The 7-day page is strict
+and shows however many qualify; the 30-day page fills its 30. `fetchJson` caches by
+its second argument, so each file must use its own path as the key.
 `build_pages.py` writes `data/new.json` as `{since, until, days, songs}`: every song
 whose `releaseDate` falls within `NEW_RELEASE_DAYS = 7` of the data date, where the data
 date is the mtime of `data.json.gz`, i.e. the scrape date. The refresh runs Mondays and
 releases land on Fridays, so the window spans exactly one release day plus its weekend.
 **Top 30, including sub-1M songs** (R39, SD-5 amended). `cleanup.py` sets aside dated
-sub-1M records with total <= 80 x daily (`NEW_CANDIDATE_RATIO`, the widest ratio the
-gate can pass in 8 days) into `recent.json.gz`; `build_pages.py` merges them into this
-pool and nowhere else. `new.json` ships the union of the top `NEW_CAP = 30` by total
+sub-1M records with total <= 310 x daily (`NEW_CANDIDATE_RATIO`) into `recent.json.gz`; `build_pages.py` merges them into these
+pools and nowhere else. The ratio is 310 (10 x 31), the widest the gate passes in the
+30-day window. `new.json` ships the union of the top `NEW_CAP = 30` by total
 and by daily; `app.js` caps at 30 after sorting, like the global chart, so popularity
 sorts within that union rather than surfacing yesterday's 5,000-stream songs. On the
 30 September data 21 qualify, not 30: kworb lists new tracks about a week late (I-10),
@@ -448,7 +454,8 @@ full value is available on hover. Applied at 45 chars for title, 35 for artist.
 | `NEW_MAX_DECAY` | build_pages.py | 10 | Plausibility gate: total <= 10 x days x daily, else the date is an album re-date |
 | `NEW_EDITION_MARKERS` | build_pages.py | regex | Titles of new editions of old songs are excluded from the pool |
 | `NEW_CAP` | build_pages.py, app.js | 30 | Top 30 per sort on the new-releases page (R39) |
-| `NEW_CANDIDATE_RATIO` | release_dates.py, cleanup.py | 80 | Sub-1M songs with total <= 80 x daily are dated and kept for the new-releases page |
+| `NEW_CANDIDATE_RATIO` | release_dates.py, cleanup.py | 310 | Sub-1M songs with total <= 310 x daily are dated and kept for the new-releases pages |
+| `NEW_WINDOWS` | build_pages.py | 7, 30 days | One entry per new-releases surface; mirror in `NEW_SURFACES` in app.js |
 | `PACE` | release_dates.py | 3.0 | Embed fetches per second; 9/s drew 429s, 3/s never has |
 | `MAX_FETCHES` | release_dates.py | 6000 | Per-run budget; env `RELEASE_DATES_MAX` overrides |
 | `DEFAULT_ARTIST` | app.js | 'Billie Eilish' | Must match `PRELOAD` |
@@ -565,7 +572,8 @@ cd public && python3 -m http.server 8000
 - `cleanup.py`: dedup, encoding fix, popularity, release date, compression; also writes
   `recent.json.gz`, the sub-1M new-release candidates (not committed)
 - `build_pages.py`: generates artist pages, per-artist shards, the global chart, the
-  new-releases file and page, the A-Z hub and the sitemap. Owns `slugs.json`.
+  7- and 30-day new-releases files and pages, the A-Z hub and the sitemap. Owns
+  `slugs.json`.
 - `slugs.json`: append-only artist name to URL slug registry (SD-21). Committed.
 - `deploy.sh`: build, gate, publish
 - `make_preload.py`: regenerates the inlined `PRELOAD` block from `data.json.gz`
