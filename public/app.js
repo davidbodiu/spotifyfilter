@@ -63,7 +63,7 @@ const RELATED_CAP = 12;
 const SHOW_STREAM_SLIDERS = false;
 
 // Billie Eilish preload for instant display (sorted by total streams)
-const PRELOAD = [{"title":"BIRDS OF A FEATHER","artist":"Billie Eilish","totalStreams":4020622722,"dailyStreams":1968059,"url":"https://open.spotify.com/track/6dOtVTDdiauQNBQEDOtlAB","popularity":489.5,"releaseDate":"2024-05-17","genre":"Alternative & Indie"},{"title":"lovely (with Khalid)","artist":"Billie Eilish (feat. Khalid)","totalStreams":3896891906,"dailyStreams":1017278,"url":"https://open.spotify.com/track/0u2P5u6lvoDfwTYjAADbn4","popularity":261.0,"releaseDate":"2018-04-19","genre":"Alternative & Indie"},{"title":"bad guy","artist":"Billie Eilish, Justin Bieber","totalStreams":2985233972,"dailyStreams":486566,"url":"https://open.spotify.com/track/2Fxmhks0bxGSBdJ92vM42m","popularity":163.0,"releaseDate":"2019-03-29","genre":"Alternative & Indie"},{"title":"when the party's over","artist":"Billie Eilish","totalStreams":2571182480,"dailyStreams":510305,"url":"https://open.spotify.com/track/43zdsphuZLzwA9k4DJhU0I","popularity":198.5,"releaseDate":"2019-03-29","genre":"Alternative & Indie"},{"title":"ocean eyes","artist":"Billie Eilish","totalStreams":2325500402,"dailyStreams":854751,"url":"https://open.spotify.com/track/2uIX8YMNjGMD7441kqyyNU","popularity":367.6,"releaseDate":"2016-11-18","genre":"Alternative & Indie"},{"title":"WILDFLOWER","artist":"Billie Eilish","totalStreams":2290438308,"dailyStreams":1648205,"url":"https://open.spotify.com/track/3QaPy1KgI7nu9FJEQUgn6h","popularity":719.6,"releaseDate":"2024-05-17","genre":"Alternative & Indie"},{"title":"everything i wanted","artist":"Billie Eilish","totalStreams":2179936093,"dailyStreams":426352,"url":"https://open.spotify.com/track/3ZCTVFBt2Brf31RLEnCkWJ","popularity":195.6,"releaseDate":"2019-11-13","genre":"Alternative & Indie"},{"title":"Happier Than Ever","artist":"Billie Eilish","totalStreams":1933130551,"dailyStreams":636856,"url":"https://open.spotify.com/track/4RVwu0g32PAqgUiJoXsdF8","popularity":329.4,"releaseDate":"2021-07-30","genre":"Alternative & Indie"},{"title":"What Was I Made For? [From The Motion Picture \"Barbie\"]","artist":"Billie Eilish","totalStreams":1688776873,"dailyStreams":512530,"url":"https://open.spotify.com/track/6wf7Yu7cxBSPrRlWeSeK0Q","popularity":303.5,"releaseDate":"2023-07-13","genre":"Alternative & Indie"},{"title":"i love you","artist":"Billie Eilish","totalStreams":1419039296,"dailyStreams":412576,"url":"https://open.spotify.com/track/6CcJMwBtXByIz4zQLzFkKc","popularity":290.7,"releaseDate":"2019-03-29","genre":"Alternative & Indie"}];
+const PRELOAD = [{"title":"BIRDS OF A FEATHER","artist":"Billie Eilish","totalStreams":4022445356,"dailyStreams":1822634,"url":"https://open.spotify.com/track/6dOtVTDdiauQNBQEDOtlAB","popularity":453.1,"releaseDate":"2024-05-17","genre":"Alternative & Indie"},{"title":"lovely (with Khalid)","artist":"Billie Eilish (feat. Khalid)","totalStreams":3897829924,"dailyStreams":938018,"url":"https://open.spotify.com/track/0u2P5u6lvoDfwTYjAADbn4","popularity":240.7,"releaseDate":"2018-04-19","genre":"Alternative & Indie"},{"title":"bad guy","artist":"Billie Eilish, Justin Bieber","totalStreams":2985654534,"dailyStreams":474241,"url":"https://open.spotify.com/track/2Fxmhks0bxGSBdJ92vM42m","popularity":158.8,"releaseDate":"2019-03-29","genre":"Alternative & Indie"},{"title":"when the party's over","artist":"Billie Eilish","totalStreams":2571676137,"dailyStreams":493657,"url":"https://open.spotify.com/track/43zdsphuZLzwA9k4DJhU0I","popularity":192.0,"releaseDate":"2019-03-29","genre":"Alternative & Indie"},{"title":"ocean eyes","artist":"Billie Eilish","totalStreams":2326328506,"dailyStreams":828104,"url":"https://open.spotify.com/track/2uIX8YMNjGMD7441kqyyNU","popularity":356.0,"releaseDate":"2016-11-18","genre":"Alternative & Indie"},{"title":"WILDFLOWER","artist":"Billie Eilish","totalStreams":2292020507,"dailyStreams":1582199,"url":"https://open.spotify.com/track/3QaPy1KgI7nu9FJEQUgn6h","popularity":690.3,"releaseDate":"2024-05-17","genre":"Alternative & Indie"},{"title":"everything i wanted","artist":"Billie Eilish","totalStreams":2180340007,"dailyStreams":403914,"url":"https://open.spotify.com/track/3ZCTVFBt2Brf31RLEnCkWJ","popularity":185.3,"releaseDate":"2019-11-13","genre":"Alternative & Indie"},{"title":"Happier Than Ever","artist":"Billie Eilish","totalStreams":1933731071,"dailyStreams":600520,"url":"https://open.spotify.com/track/4RVwu0g32PAqgUiJoXsdF8","popularity":310.5,"releaseDate":"2021-07-30","genre":"Alternative & Indie"},{"title":"What Was I Made For? [From The Motion Picture \"Barbie\"]","artist":"Billie Eilish","totalStreams":1689268914,"dailyStreams":492041,"url":"https://open.spotify.com/track/6wf7Yu7cxBSPrRlWeSeK0Q","popularity":291.3,"releaseDate":"2023-07-13","genre":"Alternative & Indie"},{"title":"i love you","artist":"Billie Eilish","totalStreams":1419440688,"dailyStreams":401392,"url":"https://open.spotify.com/track/6CcJMwBtXByIz4zQLzFkKc","popularity":282.8,"releaseDate":"2019-03-29","genre":"Alternative & Indie"}];
 
 // State
 let artistIndex = {};  // { "artist name lowercase": { name: "Display Name", count: N } }
@@ -676,6 +676,28 @@ mobileQuery.addEventListener('change', () => {
 // Random artist. Uniform over every artist in the index, so it genuinely surfaces the
 // long tail rather than reshuffling the famous names.
 const relatedEl = document.getElementById('related');
+
+// Homepage browse block (R46). The links are real hrefs to the static pages so
+// crawlers can follow them; a visitor with JS gets the in-app view instead.
+const browseEl = document.getElementById('browse');
+if (browseEl) {
+  browseEl.addEventListener('click', (e) => {
+    const a = e.target.closest('a');
+    if (!a || e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+    const surface = a.dataset.surface && SURFACES[a.dataset.surface];
+    const name = a.dataset.artist;
+    if (surface) {
+      e.preventDefault();
+      selectArtist(surface.key, surface.label);
+    } else if (name && artistIndex[name.toLowerCase()]) {
+      e.preventDefault();
+      selectArtist(artistIndex[name.toLowerCase()].name);
+    } else {
+      return;  // A to Z hub, or the index has not loaded yet: let the link navigate.
+    }
+    document.querySelector('.results').scrollIntoView({ behavior: 'smooth' });
+  });
+}
 
 // Everyone credited alongside `forName` on their own tracks, most frequent first.
 function relatedArtists(songs, forName) {

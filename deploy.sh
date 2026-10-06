@@ -52,3 +52,27 @@ fi
 
 echo "Deploying $COUNT files, $(du -sh public | cut -f1):"
 npx wrangler deploy ${1:+"$1"}
+
+# IndexNow (R46): tell Bing, Yandex and the engines that share the protocol which URLs
+# changed, right after they did. Google ignores IndexNow and reads the sitemap instead.
+# The key file public/<key>.txt proves we own the host. Non-fatal: a failed ping only
+# delays recrawl. Skipped on --dry-run, which deployed nothing.
+if [ "${1:-}" != "--dry-run" ]; then
+  python3 - <<'PY' || echo "IndexNow ping failed (non-fatal)." >&2
+import json, re, sys, urllib.request
+key = open("public/indexnow-key.txt").read().strip()
+urls = re.findall(r"<loc>(.*?)</loc>", open("public/sitemap.xml").read())[:10000]
+body = json.dumps({"host": "chartrank.app", "key": key,
+                   "keyLocation": f"https://chartrank.app/{key}.txt", "urlList": urls}).encode()
+req = urllib.request.Request("https://api.indexnow.org/indexnow", data=body,
+                             headers={"Content-Type": "application/json; charset=utf-8",
+                                      "User-Agent": "ChartRank-deploy/1.0"})
+try:
+    with urllib.request.urlopen(req, timeout=30) as r:
+        print(f"IndexNow: {len(urls):,} URLs submitted, HTTP {r.status}.")
+except urllib.error.HTTPError as e:
+    # 403 SiteVerificationNotCompleted is normal for a key IndexNow has not verified yet.
+    print(f"IndexNow refused: HTTP {e.code} {e.read()[:120].decode(errors='replace')}")
+    sys.exit(1)
+PY
+fi

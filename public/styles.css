@@ -852,6 +852,52 @@ tr {
   outline-offset: 2px;
 }
 
+/* Homepage browse block (R46). Chips like the related-artist row. */
+.browse {
+  margin-top: 28px;
+  padding-top: 18px;
+  border-top: 1px solid var(--border);
+}
+
+.browse-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.browse-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-right: 4px;
+}
+
+.browse a {
+  padding: 5px 11px;
+  border-radius: 999px;
+  border: 1px solid var(--border-control);
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 13px;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: border-color 0.2s, background 0.2s;
+}
+
+.browse a:hover {
+  border-color: var(--accent);
+  background: var(--hover);
+}
+
+.browse a:focus-visible {
+  outline: 2px solid var(--accent-text);
+  outline-offset: 2px;
+}
+
 /* Footer */
 .footer {
   margin-top: 40px;

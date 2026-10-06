@@ -41,6 +41,8 @@ silently.
 | SD-21 | `slugs.json` is append-only. A name's slug is never reassigned. | R19 | A changed slug destroys its own URL, backlinks and rankings. |
 | SD-22 | Spotify embeds are left exactly as they are, dark in both themes. | R19 | Verified: no light embed exists. User chose to leave it. |
 | SD-23 | The global **popularity** chart only ranks songs with >= 400k daily streams (`POP_MIN_DAILY`). Other sorts and per-artist views are unfiltered. | R31 | popularity = daily/total explodes near the 1M total floor; user chose a daily floor over a total floor or damped ratio. |
+| SD-27 | The Worker runs `worker/entry.js`, headcount's edge wrapper, for HTML paths only (`run_worker_first`); everything else is served straight from assets. Two plain JS modules, no build step. | R47 | David's own analytics, requested through his headcount session: "yes please include my custom analytics." |
+| SD-26 | The homepage carries a crawlable link block (`<!-- browse -->` markers, rewritten by `build_pages.py`), `/top/` exposes the global chart as text, the sitemap carries `lastmod`, every deploy pings IndexNow, and the workers.dev hostname is off. Page titles follow how people search ("[artist]: most streamed songs on Spotify"). | R46 | Only the homepage was indexed (G-20): nothing linked to the artist pages and the titles matched no query. |
 | SD-25 | Genre is per **artist** and every song inherits its first credited artist's genre. Wikidata first (exact join on Spotify artist ID, labels folded into 20 groups, country used to tell markets apart), Claude for the gaps, stored in the committed `genres.json`. | R43 | User chose Wikidata with Claude filling the gaps "if it's not too costly" over Apple, Claude-only, or Wikidata-only (R42). |
 | SD-24 | Release dates come from the Spotify **embed page**, one fetch per track ID, into `release_dates.txt`, which is append-only and committed. The new-releases surface is a 7-day window (`NEW_RELEASE_DAYS`) behind a plausibility gate (`NEW_MAX_DECAY`, since Spotify re-dates singles to their album) and an edition-marker exclusion (`NEW_EDITION_MARKERS`, R36), shows the top 30 per sort including sub-1M songs (R39), and obeys the app-wide sort. A second, 30-day surface (`/new-30/`, `?artist=new-30`) sits beside the 7-day one; the 7-day one stays strict and shows however many qualify (R40). | R33, R36, R39, R40 | The Web API now needs Premium, lost batch `GET /tracks` and is retiring Client Credentials for metadata; the embed page needs nothing. User delegated the choice to research (R33) after the options were laid out in R32. |
 
@@ -1150,6 +1152,88 @@ Presented: no-trade-off fixes ready to apply on request, SD-12 options for new s
 pages (genre, year, song pages; per-artist share images), distribution only the user can
 do, and the data needed (Search Console, analytics, goals). Awaiting the user's answer
 (MISC G-20, G-21, R-10).
+
+**R46. "Ok I've set up the search console, connected to bing and cloudflare web analytics
+seems to be hooked up already."**
+
+Verified first: a `google-site-verification` TXT record is on chartrank.app, so the
+Search Console property is the domain one; Cloudflare Web Analytics is live, the edge
+injects the beacon for browser user agents only (headless Chrome sees it, curl does
+not, which is why R45 reported none). G-21 closed. Monday's scheduled run (5 October)
+succeeded and the 7-day page came back with 7 songs, the thin case G-23 predicted.
+
+Then the no-trade-off fixes from R45, built and verified locally:
+
+- **Homepage link block** (`write_browse_block()` in `build_pages.py`, same
+  marker-rewrite pattern as `make_preload.py`): four hubs plus the 48 most streamed
+  artists by lead-artist total, as real `href`s to the static pages. `app.js`
+  intercepts plain clicks to select in place and scroll to the results; modified
+  clicks and the A to Z link navigate. Verified in headless Chrome at 1,280 and 375px:
+  clicking Drake shows "Drake: showing 1–30 of 500 songs", sets `?artist=drake`, no
+  overflow. CI now commits `public/index.html` so the block stays current.
+- **`/top/`**: the global chart's top 100 by total streams as text, with JSON-LD, the
+  one page for "most streamed songs on spotify", which the app alone could never rank
+  for. Beyond the R45 list; flagged to the user.
+- **Titles** rewritten to the measured phrasing (I-14): artist pages "Drake: Most
+  Streamed Songs on Spotify, All 500 Ranked"; new-releases pages "New Music Releases
+  This Week / This Month, Ranked by Spotify Streams"; H1s and descriptions to match.
+  No possessive, which breaks on names ending in s.
+- **Sitemap `<lastmod>`** = the data date on every URL, 3,003 URLs including `/top/`.
+  The A to Z hub now links the other hubs too.
+- **IndexNow** in `deploy.sh`: after a real deploy, every sitemap URL is POSTed to
+  api.indexnow.org with the key in `public/<key>.txt` (`public/indexnow-key.txt` holds
+  the same value for the script). Bing, Yandex and partners recrawl within hours;
+  Google ignores IndexNow and reads the sitemap. Non-fatal; skipped on `--dry-run`.
+- **`workers_dev: false`** in `wrangler.jsonc`: the duplicate hostname goes away on
+  this deploy (G-22).
+
+**Deploying required fresh data.** Local `data.json.gz` was the 30 September vintage
+and the live site Monday's, so `deploy.sh` would refuse (correctly). The weekly CI
+artifact holds only `data.json.gz`, not the sub-1M candidates the new-releases pages
+need, so a fresh local scrape was started instead (Tuesday vintage: the 7-day window
+then spans 29 September to 6 October and still contains Friday 2 October). Outcome in
+the closing note.
+
+**Cross-session coordination.** During this request another Claude Code session
+(headcount, David's own analytics Worker) asked to wire its edge wrapper into this
+Worker at David's request. Agreed by message: that session does not edit this tree; it
+sent its two files; they are staged only when David confirms the go in either session,
+because committing `"main"` would make the Monday CI run deploy it. Its wrapper was
+read in full: service binding to the headcount Worker, one injected script tag, GPC/DNT
+and opt-out honoured, fail-open. Two notes sent back: `/top` must join
+`run_worker_first`, and the wrapper strips `etag`/`last-modified` from HTML. Recorded as
+T-6.
+
+**R47. David's go for the headcount wrapper, relayed by the headcount session: "yes
+please include my custom analytics."**
+
+Relayed, not typed here; this session had told David that either channel counts, so
+it was acted on and is stated plainly in the reply. Staged: `worker/headcount.js`
+(byte-identical copy, sha256 8f8a142d…, 10,889 bytes), `worker/entry.js` as supplied,
+and in `wrangler.jsonc` `"main"`, the `ASSETS` binding, `run_worker_first` for the HTML
+paths plus `/top` and `/top/*`, and the `HEADCOUNT` service binding. The homepage
+footer links `/_hc/optout`. `wrangler deploy --dry-run` bundles 8.7 KiB and resolves
+both bindings. Shipped in the R46 deploy; verification in that closing note.
+
+The architecture statement changes with this: the Worker is no longer assets-only.
+HTML requests to the listed paths run the wrapper, which calls the asset handler and
+appends one script tag; data JSON, `app.js`, CSS and images never touch the script.
+Wrangler's "Read 9,024 files" on deploy counts directories; there are 6,019 files.
+
+**Closing note for R46 and R47, 6 October 13:35.** Fresh scrape: 508,282 raw, 325,462
+songs, 412 new release dates, genres 98.3%. Deployed as `9603a4ed`, verified live: data
+vintage 6 October; `/new/` 8 songs (29 September to 6 October), `/new-30/` 39; `/top/`,
+`/_hc/s.js`, `/_hc/optout` and the IndexNow key file all 200; Drake's title reads
+"Drake: Most Streamed Songs on Spotify, All 500 Ranked"; the homepage carries 48 artist
+links; 3,003 sitemap entries with `lastmod`; the headcount tag is on `/`,
+`/artist/drake/` and `/top/` for a browser user agent while `data/artists.json` still
+returns an asset `etag`, so the Worker only runs for HTML; the workers.dev host returns
+404. IndexNow answered 403 `SiteVerificationNotCompleted` on first use, its normal
+reply for an unverified key; it verifies asynchronously and the ping is retried. The
+deploy script now prints IndexNow's response body. Noticed in passing: Cloudflare
+returns 403 to the `Python-urllib` user agent and nothing else tested (curl, bingbot,
+Googlebot, YandexBot, python-requests, Go, empty, headcount-health all 200); harmless
+for crawlers, recorded under G-6.
 
 **R25. Related artists; then the mobile crash report; then "make it 30 on desktop" plus
 the Buy Me a Coffee widget script.**

@@ -41,6 +41,9 @@ SITE = "https://chartrank.app"
 
 SONGS_ON_PAGE = 50      # rendered as text for crawlers; the app fetches the full shard
 GLOBAL_CAP = 1000       # must match GLOBAL_CAP in app.js
+TOP_ON_PAGE = 100       # rows rendered as text on /top/; the app has all 1,000
+BROWSE_ARTISTS = 48     # artist links in the homepage browse block (R46)
+MAX_ARTISTS_WORD = "3,000"
 POP_MIN_DAILY = 400_000  # global POPULARITY chart only (SD-23, R31). popularity is
                          # daily/total, which explodes near the 1M total floor: 703 of
                          # the unfiltered top-1000 had under 5M total. Chosen by the
@@ -178,21 +181,26 @@ def page_html(name, slug, songs, collaborators, genre=None):
         ],
     }
 
-    desc = (f"All {len(songs)} {name} songs ranked by Spotify streams. "
-            f"{total:,} total streams. Updated weekly.")
+    # Titles follow how people search: "[artist] most streamed songs",
+    # "[artist] songs ranked by streams" (R46, I-14). No possessive: it breaks on
+    # names ending in s.
+    title = f"{name}: Most Streamed Songs on Spotify, All {len(songs)} Ranked"
+    desc = (f"{name}: all {len(songs)} songs ranked by Spotify streams, most streamed "
+            f"first. {total:,} total streams, with daily plays, release dates and genre. "
+            f"Updated weekly.")
 
     return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>{esc(name)}: Every Song Ranked by Spotify Streams | ChartRank</title>
+<title>{esc(title)} | ChartRank</title>
 <meta name="description" content="{esc(desc)}">
 <link rel="canonical" href="{SITE}/artist/{slug}/">
 <meta name="color-scheme" content="light dark">
 <meta property="og:type" content="music.musician">
 <meta property="og:url" content="{SITE}/artist/{slug}/">
-<meta property="og:title" content="{esc(name)}: Every Song Ranked by Spotify Streams">
+<meta property="og:title" content="{esc(title)}">
 <meta property="og:description" content="{esc(desc)}">
 <meta property="og:image" content="{SITE}/og-image.png">
 <meta name="twitter:card" content="summary_large_image">
@@ -216,7 +224,7 @@ def page_html(name, slug, songs, collaborators, genre=None):
 
   <nav class="crumbs"><a href="/">Home</a> / <a href="/artists/">Artists</a> / {esc(name)}</nav>
 
-  <h2 class="page-title">{esc(name)}: every song ranked by Spotify streams</h2>
+  <h2 class="page-title">{esc(name)}: most streamed songs on Spotify, all {len(songs)} ranked</h2>
   <p class="page-lede">{f"{esc(genre)}. " if genre else ""}{len(songs)} songs, {total:,} total streams.
      <a href="/?artist={slug}">Open in the interactive chart</a> to sort by daily plays
      or momentum and play previews.</p>
@@ -271,8 +279,13 @@ def new_releases(songs, data_date, days):
     return since, union, dropped, len(pool)
 
 
+NEW_WORDS = {7: "This Week", 30: "This Month"}   # how the searches are phrased (I-14)
+
+
 def new_page_html(pool, since, data_date, slug, days, siblings):
     top = pool[:NEW_CAP]
+    when = NEW_WORDS.get(days, f"Last {days} Days")
+    title = f"New Music Releases {when}, Ranked by Spotify Streams"
     others = " · ".join(f'<a href="/{s}/">Last {d} days</a>' for s, d in siblings)
     rows = "\n".join(
         f'      <tr><td>{i}</td><td>{esc(s["title"])}</td>'
@@ -296,13 +309,13 @@ def new_page_html(pool, since, data_date, slug, days, siblings):
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>New Releases, Last {days} Days, Ranked by Spotify Streams | ChartRank</title>
+<title>{title} | ChartRank</title>
 <meta name="description" content="{esc(desc)}">
 <link rel="canonical" href="{SITE}/{slug}/">
 <meta name="color-scheme" content="light dark">
 <meta property="og:type" content="website">
 <meta property="og:url" content="{SITE}/{slug}/">
-<meta property="og:title" content="New Releases, Last {days} Days, Ranked by Spotify Streams">
+<meta property="og:title" content="{title}">
 <meta property="og:description" content="{esc(desc)}">
 <meta property="og:image" content="{SITE}/og-image.png">
 <meta name="twitter:card" content="summary_large_image">
@@ -326,7 +339,7 @@ def new_page_html(pool, since, data_date, slug, days, siblings):
 
   <nav class="crumbs"><a href="/">Home</a> / New releases, last {days} days</nav>
 
-  <h2 class="page-title">New releases: the most streamed songs of the last {days} days</h2>
+  <h2 class="page-title">New music releases {when.lower()}: the most streamed songs of the last {days} days</h2>
   <p class="page-lede">The top {len(top)} songs released between {since.isoformat()} and
      {data_date.isoformat()}, by total streams.
      <a href="/?artist={slug}">Open in the interactive chart</a> to sort by daily plays
@@ -345,6 +358,120 @@ def new_page_html(pool, since, data_date, slug, days, siblings):
 </body>
 </html>
 """
+
+
+def top_page_html(rows, data_date):
+    """The global chart, top TOP_ON_PAGE by total streams, as text (R46)."""
+    top = rows[:TOP_ON_PAGE]
+    body = "\n".join(
+        f'      <tr><td>{i}</td><td>{esc(s["title"])}</td><td>{esc(s["artist"])}</td>'
+        f'<td>{s["totalStreams"]:,}</td><td>{s["dailyStreams"]:,}</td>'
+        f'<td>{esc(s.get("releaseDate", ""))}</td><td>{esc(s.get("genre", ""))}</td></tr>'
+        for i, s in enumerate(top, 1))
+    title = f"Most Streamed Songs on Spotify: Top {len(rows):,} of All Time, Ranked"
+    desc = (f"The {len(rows):,} most streamed songs on Spotify of all time, ranked by total "
+            f"streams, with daily plays, release date and genre. Updated weekly from the "
+            f"catalogues of {MAX_ARTISTS_WORD} artists.")
+    ld = {"@context": "https://schema.org", "@type": "ItemList", "name": title,
+          "numberOfItems": len(top), "itemListElement": [
+              {"@type": "ListItem", "position": i,
+               "item": {"@type": "MusicRecording", "name": s["title"], "url": s["url"],
+                        "byArtist": {"@type": "MusicGroup", "name": s["artist"]}}}
+              for i, s in enumerate(top, 1)]}
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{title} | ChartRank</title>
+<meta name="description" content="{esc(desc)}">
+<link rel="canonical" href="{SITE}/top/">
+<meta name="color-scheme" content="light dark">
+<meta property="og:type" content="website">
+<meta property="og:url" content="{SITE}/top/">
+<meta property="og:title" content="{title}">
+<meta property="og:description" content="{esc(desc)}">
+<meta property="og:image" content="{SITE}/og-image.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="/favicon.ico" sizes="32x32">
+<link rel="icon" href="/icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../styles.css">
+<script type="application/ld+json">{json.dumps(ld, ensure_ascii=False)}</script>
+</head>
+<body>
+<div class="app">
+  <header class="header">
+    <div class="logo">
+      <svg class="logo-mark" viewBox="0 0 24 24" width="32" height="32" aria-hidden="true">
+        <rect x="3" y="13" width="4.5" height="8" rx="1.5"/>
+        <rect x="9.75" y="8" width="4.5" height="13" rx="1.5"/>
+        <rect x="16.5" y="3" width="4.5" height="18" rx="1.5"/>
+      </svg>
+      <h1>ChartRank</h1>
+    </div>
+  </header>
+
+  <nav class="crumbs"><a href="/">Home</a> / Most streamed songs</nav>
+
+  <h2 class="page-title">The most streamed songs on Spotify of all time</h2>
+  <p class="page-lede">The top {len(top)} of {len(rows):,}, by total streams, as of
+     {data_date.isoformat()}. <a href="/?artist=global">Open the interactive chart</a> for
+     all {len(rows):,}, sorted by total, daily or momentum, with previews. Also:
+     <a href="/new/">new releases this week</a> · <a href="/new-30/">new this month</a> ·
+     <a href="/artists/">every artist A to Z</a>.</p>
+
+  <div class="table-wrapper">
+    <table>
+      <thead><tr><th>#</th><th>Title</th><th>Artist</th><th>Total streams</th><th>Daily streams</th><th>Released</th><th>Genre</th></tr></thead>
+      <tbody>
+{body}
+      </tbody>
+    </table>
+  </div>
+</div>
+{BMC_WIDGET}
+</body>
+</html>
+"""
+
+
+def write_browse_block(by_artist, registry):
+    """Rewrite the crawlable link block in public/index.html (R46).
+
+    The homepage is a JS app whose only hrefs were icons, so crawlers found the 2,998
+    artist pages through the sitemap alone and ranked none of them. This block gives
+    every hub and the most streamed artists a real link from the homepage. The app
+    intercepts clicks on it to select in place; crawlers follow the hrefs. Same
+    marker-rewrite pattern as make_preload.py, so the block is committed with
+    index.html and stays current with the data.
+    """
+    path = f"{OUT}/index.html"
+    src = open(path, encoding="utf-8").read()
+    start, end = "<!-- browse:start -->", "<!-- browse:end -->"
+    i, j = src.find(start), src.find(end)
+    if i < 0 or j < 0:
+        print("::warning::index.html has no browse markers; homepage link block not written.")
+        return
+    streams = {n: sum(s["totalStreams"] for s in songs if (s.get("leads") or [None])[0] == n)
+               for n, songs in by_artist.items()}
+    top = sorted((n for n in streams if n in registry), key=lambda n: -streams[n])[:BROWSE_ARTISTS]
+    chips = "\n".join(
+        f'        <a href="/artist/{registry[n]}/" data-artist="{esc(n)}">{esc(n)}</a>' for n in top)
+    block = f"""{start}
+    <section class="browse" id="browse" aria-label="Browse">
+      <p class="browse-row"><span class="browse-label">Charts</span>
+        <a href="/top/" data-surface="global">Most streamed songs of all time</a>
+        <a href="/new/" data-surface="new">New releases this week</a>
+        <a href="/new-30/" data-surface="new-30">New this month</a>
+        <a href="/artists/">All artists A to Z</a>
+      </p>
+      <p class="browse-row"><span class="browse-label">Most streamed artists</span>
+{chips}
+      </p>
+    </section>
+    {end}"""
+    open(path, "w", encoding="utf-8").write(src[:i] + block + src[j + len(end):])
+    print(f"Homepage browse block: 4 hubs + {len(top)} artists.")
 
 
 def main():
@@ -454,6 +581,13 @@ def main():
     with open(f"{OUT}/data/global.json", "w", encoding="utf-8") as f:
         json.dump(glob, f, ensure_ascii=False, separators=(",", ":"))
 
+    # /top/: the global chart as crawlable text (R46). "most streamed songs on spotify"
+    # is the highest-volume query the site has data for, and until now the chart lived
+    # only behind ?artist=global, which a crawler never renders.
+    os.makedirs(f"{OUT}/top", exist_ok=True)
+    with open(f"{OUT}/top/index.html", "w", encoding="utf-8") as f:
+        f.write(top_page_html(glob["totalStreams"], data_date))
+
     # A-Z hub, so every artist page has at least one internal link pointing at it.
     buckets = {}
     for e in sorted(index, key=lambda e: e["n"].lower()):
@@ -476,23 +610,29 @@ def main():
 </head><body><div class="app">
 <nav class="crumbs"><a href="/">Home</a> / Artists</nav>
 <h2 class="page-title">All {len(index):,} artists</h2>
+<p class="page-lede">Also: <a href="/top/">the 1,000 most streamed songs</a> ·
+<a href="/new/">new releases this week</a> · <a href="/new-30/">new this month</a>.</p>
 {sections}
 </div></body></html>
 """)
 
-    urls = ([f"{SITE}/", f"{SITE}/artists/"] + [f"{SITE}/{w[0]}/" for w in NEW_WINDOWS]
+    urls = ([f"{SITE}/", f"{SITE}/top/", f"{SITE}/artists/"]
+            + [f"{SITE}/{w[0]}/" for w in NEW_WINDOWS]
             + [f"{SITE}/artist/{e['s']}/" for e in index])
+    # Every page is regenerated from the week's data, so the data date is each page's
+    # honest lastmod (R46). Search engines use it to decide what to recrawl.
     with open(f"{OUT}/sitemap.xml", "w", encoding="utf-8") as f:
         f.write('<?xml version="1.0" encoding="UTF-8"?>\n'
                 '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n')
         for u in urls:
-            f.write(f"  <url><loc>{u}</loc></url>\n")
+            f.write(f"  <url><loc>{u}</loc><lastmod>{data_date.isoformat()}</lastmod></url>\n")
         f.write("</urlset>\n")
     print(f"sitemap.xml: {len(urls):,} URLs (limit is 50,000 per file).")
 
     with open(f"{OUT}/robots.txt", "w", encoding="utf-8") as f:
         f.write(f"User-agent: *\nAllow: /\n\nSitemap: {SITE}/sitemap.xml\n")
 
+    write_browse_block(by_artist, registry)
     print(f"Wrote {len(index):,} artist pages and shards.")
 
 

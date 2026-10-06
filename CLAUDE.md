@@ -58,6 +58,7 @@ scrape.py  →  data.json (~106 MB)  →  release_dates.py  →  release_dates.t
    public/data/artists.json (45 KB gz)  +  public/data/artist/<slug>.json (~7 KB each)
    public/data/global.json              +  public/artist/<slug>/index.html x 2,998
    public/data/new.json                 +  public/new/index.html
+   public/top/index.html                +  public/index.html (browse block rewritten)
    public/sitemap.xml                   +  public/artists/index.html
 ```
 
@@ -415,6 +416,28 @@ wrap onto two lines at phone widths. Both fields are in the render signature. Th
 `make_preload.py` inlines it, otherwise the preload rows would never be rebuilt once
 the shard arrived and the first ten Billie Eilish rows would show no date.
 
+### Discoverability (SD-26)
+
+The homepage is a JS app, so until R46 its only `href`s were icons and crawlers
+reached the 2,998 artist pages through the sitemap alone; only the homepage was
+indexed. Now:
+
+- `build_pages.py`'s `write_browse_block()` rewrites the block between
+  `<!-- browse:start -->` and `<!-- browse:end -->` in `public/index.html` on every
+  build: links to `/top/`, `/new/`, `/new-30/`, `/artists/` and the `BROWSE_ARTISTS`
+  (48) most streamed artists. `app.js` intercepts plain clicks to select in place;
+  crawlers and modified clicks follow the `href`. CI commits `public/index.html`.
+- `/top/` is the global chart's top 100 by total streams as text (`TOP_ON_PAGE`), the
+  page that can rank for "most streamed songs on spotify".
+- Titles follow measured search phrasing (I-14): artist pages "X: Most Streamed Songs
+  on Spotify, All N Ranked", new-releases pages "New Music Releases This Week / This
+  Month". No possessives.
+- `sitemap.xml` carries `<lastmod>` = data date on every URL. `deploy.sh` pings
+  IndexNow with all sitemap URLs after a real deploy (key in `public/<key>.txt`).
+- `workers_dev: false`: chartrank.app is the only public hostname.
+- Search Console (domain property, DNS-verified) and Bing Webmaster are set up by the
+  user; Cloudflare Web Analytics is on, injected at the edge for browsers only.
+
 ### Theming (SD-15, SD-16)
 
 `styles.css` defines semantic tokens, not literal colours. The old `--black` / `--white`
@@ -510,6 +533,8 @@ full value is available on hover. Applied at 45 chars for title, 35 for artist.
 | `NEW_EDITION_MARKERS` | build_pages.py | regex | Titles of new editions of old songs are excluded from the pool |
 | `NEW_CAP` | build_pages.py, app.js | 30 | Top 30 per sort on the new-releases page (R39) |
 | `NEW_CANDIDATE_RATIO` | release_dates.py, cleanup.py | 310 | Sub-1M songs with total <= 310 x daily are dated and kept for the new-releases pages |
+| `TOP_ON_PAGE` | build_pages.py | 100 | Rows rendered as text on `/top/` |
+| `BROWSE_ARTISTS` | build_pages.py | 48 | Artist links in the homepage browse block |
 | `NEW_WINDOWS` | build_pages.py | 7, 30 days | One entry per new-releases surface; mirror in `NEW_SURFACES` in app.js |
 | `CLAUDE_MAX_USD` | genres.py | 2.00 | Hard spending cap per run for the Claude gap-filler |
 | `GENRES` | genres.py | 20 groups | The only values a song's `genre` can take |
@@ -558,7 +583,17 @@ wiring the filter logic back into `applyFilters()`.
 **Confirmed 1 August 2026** via `wrangler deployments list --name spotifyfilter`:
 
 - The site is a **Cloudflare Worker** named `spotifyfilter` serving static assets. It is
-  **not** Pages (`wrangler pages project list` is empty).
+  **not** Pages (`wrangler pages project list` is empty). Since R47 it also has a
+  script: `worker/entry.js` wraps the asset handler with headcount, David's own
+  analytics, for the HTML paths in `wrangler.jsonc`'s `run_worker_first` (SD-27). The
+  wrapper (`worker/headcount.js`, generated upstream in
+  `~/Desktop/claude-projects/web analytics/edge/`, copied byte for byte, never edited
+  here) reports each HTML request to the `headcount` Worker over a service binding,
+  appends one `/_hc/s.js` script tag, honours GPC, DNT and the `/_hc/optout` cookie,
+  and on any error or a missing binding serves the page untouched. It strips `etag`
+  and `last-modified` from HTML by design. Data, JS, CSS and images never run it. To
+  update the wrapper, copy the upstream file again. Cloudflare Web Analytics stays on
+  as the second, edge-injected collector.
 - Every deployment is `Source: Upload`, i.e. a manual `wrangler deploy`. **There is no
   git integration: pushing to GitHub publishes nothing.**
 - The live version dates from **31 March 2026**.
@@ -639,14 +674,18 @@ cd public && python3 -m http.server 8000
   7- and 30-day new-releases files and pages, the A-Z hub and the sitemap. Owns
   `slugs.json`.
 - `slugs.json`: append-only artist name to URL slug registry (SD-21). Committed.
-- `deploy.sh`: build, gate, publish
+- `deploy.sh`: build, gate, publish, IndexNow ping
+- `worker/entry.js`, `worker/headcount.js`: the Worker script, headcount's edge wrapper
+  around the asset handler (SD-27). Plain JS, bundled by wrangler, no build step.
 - `make_preload.py`: regenerates the inlined `PRELOAD` block from `data.json.gz`
 - `.github/workflows/refresh-data.yml`: weekly refresh, Mondays 04:10 UTC (SD-17)
 - `favicon.ico` / `icon.svg` / `apple-touch-icon.png` / `icon-192.png` / `icon-512.png`
   / `manifest.webmanifest`: icon set, all drawn from the same three-bar geometry as the
   inline header mark
 - `robots.txt`: permissive, names the sitemap. Crawlers reach every page (G-6 fixed);
-  only the homepage is indexed so far (G-20)
+  only the homepage was indexed as of 3 October (G-20), the R46 fixes address that
+- `public/<key>.txt` and `public/indexnow-key.txt`: the IndexNow key, hosted and
+  mirrored; `deploy.sh` reads the mirror
 - `snapshots/`: dated copies of past `data.json.gz`, for future time-window deltas
 - `data.json.gz`: generated dataset, NOT committed (SD-19)
 - `scrape_progress.json`: temporary resume file, auto-deleted on success

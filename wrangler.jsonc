@@ -1,6 +1,9 @@
 {
-  // Static-assets-only Worker. There is no `main`, so no Worker script runs: Cloudflare
-  // just serves the files in `assets.directory`.
+  // Static assets plus one small Worker script (R47): worker/entry.js wraps the asset
+  // handler with headcount, David's own analytics, for the HTML paths listed in
+  // run_worker_first. Every other path (data JSON, app.js, styles.css, images) is served
+  // straight from `assets.directory` without running the script. No build step: the
+  // two files in worker/ are plain JS modules that wrangler bundles on deploy (SD-1).
   //
   // This config previously existed ONLY on the unmerged branch
   // origin/cloudflare/workers-autoconfig, so `wrangler deploy` from main failed with a
@@ -8,7 +11,11 @@
   // every deployment is Source "Upload", i.e. a manual `wrangler deploy`. There is NO
   // git integration, so pushing to GitHub does not publish anything.
   "name": "spotifyfilter",
+  "main": "worker/entry.js",
   "compatibility_date": "2025-09-27",
+  // The site has one public hostname, chartrank.app. The workers.dev address served a
+  // full duplicate of it (R45, G-22); canonical tags limited the harm, this removes it.
+  "workers_dev": false,
   "observability": {
     "enabled": true
   },
@@ -17,6 +24,15 @@
     // to upload the whole repo root (including the 106 MB data.json, over the 25 MiB
     // per-file cap); pointing it at an uncommitted staging dir broke the Workers
     // Builds git integration, which checks out the repo and finds nothing there.
-    "directory": "./public"
-  }
+    "directory": "./public",
+    "binding": "ASSETS",
+    // Only HTML pages (and headcount's own /_hc/* paths) go through the Worker.
+    "run_worker_first": [
+      "/", "/artist/*", "/artists", "/artists/*", "/new", "/new/*",
+      "/new-30", "/new-30/*", "/top", "/top/*", "/_hc/*"
+    ]
+  },
+  // headcount's collector, a separate Worker in the same account. Without it the
+  // wrapper passes every request through untouched.
+  "services": [{ "binding": "HEADCOUNT", "service": "headcount", "entrypoint": "Collector" }]
 }

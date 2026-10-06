@@ -376,6 +376,12 @@ are settled.
 
 ### G-6. chartrank.app returns HTTP 403 to every non-browser client `FIXED` (no longer reproduces)
 
+**6 October (R46):** one residue: the `Python-urllib` user agent alone gets 403
+(python-requests, Go, curl, every crawler tested: 200). A Cloudflare managed rule, not
+a site setting. Irrelevant to indexing; relevant to anyone scripting against the site
+with the Python standard library, including `release_dates.py` style checks against
+our own pages: set a User-Agent.
+
 **3 October 2026 (R45):** every client tested gets 200 on `/`, `/robots.txt`,
 `/sitemap.xml` and `/artist/drake/`: plain curl, Googlebot, Bingbot, a browser, and
 the Facebook, Twitter and Slack preview bots. Whatever challenge was in place has been
@@ -508,6 +514,9 @@ date is per edition and say so on the page.
 
 ### G-23. The 7-day new-releases page depends on which day the refresh runs `OPEN` `DECISION`
 
+**Measured 5 October (R46):** the first Monday run with full data produced 7 songs in
+the 7-day window, 41 in the 30-day one. Thin, as predicted; the decision stands open.
+
 R44. The window is the seven days before the data date. The design assumed Monday
 runs, which catch the previous Friday's releases three days on. A manual Saturday run
 (3 October) started its window on 26 September, missed the 25 September releases, and
@@ -519,7 +528,24 @@ options include ending the window a few days before the data date, or anchoring 
 the most recent Friday kworb has had time to list. Either changes the strict 7-day rule
 the user chose in R40, so it needs their decision.
 
-### G-20. Only the homepage is in search results `OPEN` `HIGH`
+### T-6. headcount edge wrapper: staged on David's go, not before `DONE` (R47, go relayed by the headcount session)
+
+Staged and shipped with the R46 deploy, `/top` included in `run_worker_first`, opt-out
+linked from the footer. Original note kept below.
+
+R46. David's other session (headcount) supplied `worker/headcount.js` (copy from
+`~/Desktop/claude-projects/web analytics/edge/js/headcount.js`, 10,889 bytes) and a
+three-line `worker/entry.js`, plus `wrangler.jsonc` additions: `"main":
+"worker/entry.js"`, `assets.binding: "ASSETS"`, `assets.run_worker_first` for the HTML
+paths (add `/top`, `/top/*`), and the `HEADCOUNT` service binding. It turns this
+assets-only Worker into a scripted one for HTML requests; data, JS and CSS stay on the
+asset path. Cloudflare Web Analytics is already live, so this is a second collector;
+the headcount session says that is the point (likely-human counts beside Cloudflare's
+beacon counts). Because the CI run deploys whatever is on main, nothing is committed
+until David says go in either session. Then: copy the two files, patch wrangler.jsonc,
+deploy, verify `/_hc/s.js` is injected, and link `/_hc/optout` from the footer.
+
+### G-20. Only the homepage is in search results `IN PROGRESS` (fixes shipped R46; indexing takes weeks)
 
 R45. `site:chartrank.app` returns the homepage only. Causes, all fixable: no Search
 Console or Bing Webmaster verification, so the sitemap was never submitted; the
@@ -531,14 +557,16 @@ homepage link block (popular artists, A-Z, new releases), `<lastmod>` from the d
 date, search-matched titles, IndexNow ping to Bing and Yandex after each deploy, and
 Search Console submission (needs the user).
 
-### G-21. The site has no analytics `OPEN` `HIGH`
+### G-21. The site has no analytics `FIXED` (Cloudflare Web Analytics, verified R46)
+
+The beacon is injected at the edge for browser user agents; curl never sees it.
 
 R45. No beacon or analytics script on any page, so visitors, referrers and top pages
 are unknown and no change to discovery can be measured. Cloudflare Web Analytics is
 free, cookieless, needs no consent banner and can be switched on for a proxied domain
 in the dashboard with no code change.
 
-### G-22. The site is also public at spotifyfilter.bodiud.workers.dev `OPEN` `LOW`
+### G-22. The site is also public at spotifyfilter.bodiud.workers.dev `FIXED` (R46, `workers_dev: false`)
 
 R45. Same content on a second hostname. Canonical tags on the artist pages point at
 chartrank.app, which limits the harm, but `workers_dev: false` in `wrangler.jsonc`
