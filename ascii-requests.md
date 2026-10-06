@@ -989,3 +989,19 @@ Updated after every request. See the maintenance protocol in `CLAUDE.md`.
         |
   (( SD-27 ))
 ```
+
+## R48, 6 October: scuffed thumbnail, wording, DataForSEO
+
+```
+  (( three questions ))
+        |
+        [ og-image ] --> 1200x630, corner logo, 24-48px text => smudge at ~100px
+        [ homepage ] --> no JSON-LD, 66-char title truncated at "Ranked"
+        [ suggest API ] --> "new music releases this week" fine; "top songs this
+        |                   week spotify" has no matching page (daily sort would)
+        [ DataForSEO ] --> $50 min, <$1 for every volume we need; links are the gap
+        |
+        [ answers + ranked plan; options per SD-12 ]   (G-24, R-10 widened)
+        |
+  (( awaiting choices ))
+```

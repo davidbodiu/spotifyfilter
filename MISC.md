@@ -545,6 +545,14 @@ beacon counts). Because the CI run deploys whatever is on main, nothing is commi
 until David says go in either session. Then: copy the two files, patch wrangler.jsonc,
 deploy, verify `/_hc/s.js` is injected, and link `/_hc/optout` from the footer.
 
+### G-24. The share image is unreadable as a search thumbnail `OPEN` `LOW`
+
+R48. `og-image.png` (1,200 x 630) has a corner logo, a 48px tagline and a 24px stats
+line; Google shrinks the whole thing to ~100px and shows smudges. Fix: one large mark
+and one short line, nothing under ~80px; a square 1:1 variant; WebSite and Organization
+JSON-LD on the homepage with `logo` and `image`. The 66-character homepage title also
+truncates at "Ranked" in results. Per-artist share images are the R-10 option 4.
+
 ### G-20. Only the homepage is in search results `IN PROGRESS` (fixes shipped R46; indexing takes weeks)
 
 R45. `site:chartrank.app` returns the homepage only. Causes, all fixable: no Search

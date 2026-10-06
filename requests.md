@@ -1236,6 +1236,37 @@ returns 403 to the `Python-urllib` user agent and nothing else tested (curl, bin
 Googlebot, YandexBot, python-requests, Go, empty, headcount-health all 200); harmless
 for crawlers, recorded under G-6.
 
+**R48. Screenshot of the Google result for chartrank.app: "why such a scuffed preview
+image? Is 'New releases this week' the best wording for seo? Would a tool such as
+dataforseo help, or what can we do to optimally improve visibility on the internet?"**
+
+Questions; no code changed. Findings:
+
+- **Thumbnail.** Google shrinks the whole 1,200 x 630 `og-image.png` to roughly 100px.
+  Its layout is a logo in one corner, a 48px tagline and a 24px stats line, which at
+  that scale become smudges on a dark card. The homepage also has no JSON-LD, so Google
+  has no `image` or `logo` hint and no square variant to use instead of a crop. Fix
+  offered: a bolder image (one large mark, one short line, no small text), a 1:1
+  variant, and WebSite/Organization JSON-LD; per-artist share images remain an R-10
+  option. The homepage `<title>` is 66 characters and Google truncated it at "Ranked".
+- **Wording.** Suggestions: "new music releases this week" and "new songs this week"
+  both strong; "spotify new releases" is about the Spotify app, not charts; "top songs
+  this week spotify" and "what song is being streamed the most this week" point at a
+  page the site does not have: the week's most streamed songs by daily plays, which is
+  the global chart's daily sort. Current title judged fine; the limit is the page's
+  8 songs and the competition (Spotify, Pitchfork, Billboard), not the words.
+- **DataForSEO.** $50 minimum deposit, credits never expire; search volume $0.06 to
+  $0.09 per request of up to 1,000 keywords; SERP checks $0.0006 each. Volumes for
+  every candidate page pattern would cost under a dollar; its real use is sizing the
+  R-10 options and weekly rank tracking. Free alternatives: Search Console impressions
+  (after indexing), Google Keyword Planner ranges, Bing Webmaster keyword research.
+  Presented as options per SD-12 with the view that links, not keyword data, are the
+  bottleneck for a domain with no backlinks.
+
+Ranked plan given: links and mentions first, then pages that match demand (song, year,
+genre, top-this-week), then share images and the homepage metadata. Awaiting choices
+(R-10 widened to include a "top songs this week" page; MISC G-24 for the image).
+
 **R25. Related artists; then the mobile crash report; then "make it 30 on desktop" plus
 the Buy Me a Coffee widget script.**
 
