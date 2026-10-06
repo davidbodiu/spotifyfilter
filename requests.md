@@ -1229,7 +1229,8 @@ links; 3,003 sitemap entries with `lastmod`; the headcount tag is on `/`,
 `/artist/drake/` and `/top/` for a browser user agent while `data/artists.json` still
 returns an asset `etag`, so the Worker only runs for HTML; the workers.dev host returns
 404. IndexNow answered 403 `SiteVerificationNotCompleted` on first use, its normal
-reply for an unverified key; it verifies asynchronously and the ping is retried. The
+reply for an unverified key; it verified within five minutes and the retry returned
+HTTP 200 with all 3,003 URLs at 13:40. The
 deploy script now prints IndexNow's response body. Noticed in passing: Cloudflare
 returns 403 to the `Python-urllib` user agent and nothing else tested (curl, bingbot,
 Googlebot, YandexBot, python-requests, Go, empty, headcount-health all 200); harmless
